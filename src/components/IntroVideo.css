@@ -1,0 +1,115 @@
+.intro-video {
+  padding: 0 0 80px;
+  position: relative;
+}
+
+.intro-video__wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.intro-video__frame {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(
+    145deg,
+    rgba(245, 243, 238, 0.7),
+    rgba(237, 233, 224, 0.7)
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-xl);
+}
+
+.intro-video__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.intro-video__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  cursor: pointer;
+  background: rgba(250, 249, 246, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: all var(--transition-medium);
+}
+
+.intro-video__overlay:hover .intro-video__play-btn {
+  transform: scale(1.1);
+  box-shadow: 0 8px 32px rgba(74, 93, 35, 0.3);
+}
+
+.intro-video__play-btn {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(250, 249, 246, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-medium);
+  backdrop-filter: blur(8px);
+}
+
+.intro-video__label {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-weight: 450;
+  letter-spacing: 0.02em;
+}
+
+.intro-video__gradient-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    var(--olive-200),
+    transparent,
+    var(--gold-light)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .intro-video {
+    padding: 0 0 60px;
+  }
+
+  .intro-video__play-btn {
+    width: 64px;
+    height: 64px;
+  }
+
+  .intro-video__play-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .intro-video__label {
+    font-size: 0.85rem;
+  }
+}
