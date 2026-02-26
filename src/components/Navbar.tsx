@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import "./Navbar.css";
+import LogoImg from "../assets/Logo.png";
 
 interface NavbarProps {
   onJoinWaitlist: () => void;
@@ -27,23 +28,11 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
       {/* Logo — outside navbar */}
       <a href="#" className="header__logo">
         <div className="header__logo-icon">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect
-              x="2"
-              y="2"
-              width="24"
-              height="24"
-              rx="6"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-            <path
-              d="M8 10h12M8 14h8M8 18h10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <img
+            src={LogoImg}
+            alt="Escrows AI Logo"
+            className="header__logo-img"
+          />
         </div>
         <span className="header__logo-text">Escrows AI</span>
       </a>
