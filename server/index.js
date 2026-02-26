@@ -12,14 +12,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ─── MongoDB Connection ───
-const MONGODB_URI = process.env.MONGODB_URI;
-
-mongoose
-  .connect(MONGODB_URI, { dbName: "waitlist_clients" })
-  .then(() => console.log("✅ Connected to MongoDB — waitlist_clients"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err.message));
-
 // ─── Waitlist Schema & Model ───
 const waitlistSchema = new mongoose.Schema(
   {
@@ -145,7 +137,34 @@ app.get("/{*splat}", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
+// ─── Start server only after MongoDB connects ───
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+const MONGODB_URI = process.env.MONGODB_URI;
+
+async function start() {
+  if (!MONGODB_URI) {
+    console.error("❌ MONGODB_URI environment variable is not set!");
+    process.exit(1);
+  }
+
+  // Log redacted URI for debugging
+  const redacted = MONGODB_URI.replace(/:([^@]+)@/, ":****@");
+  console.log(`🔗 Connecting to MongoDB: ${redacted}`);
+
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      dbName: "waitlist_clients",
+      serverSelectionTimeoutMS: 15000, // fail faster with clear error
+    });
+    console.log("✅ Connected to MongoDB — waitlist_clients");
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err.message);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+}
+
+start();
