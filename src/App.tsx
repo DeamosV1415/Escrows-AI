@@ -58,3 +58,27 @@ function LandingPage() {
     </>
   );
 }
+
+/* ─── App ─── */
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Landing page */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Dashboard (product) */}
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="clients" element={<ClientsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="sequences" element={<SequencesPage />} />
+          <Route path="inbox" element={<InboxPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
