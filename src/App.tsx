@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import IntroVideo from "./components/IntroVideo";
@@ -8,14 +9,21 @@ import CTA from "./components/CTA";
 import Footer from "./components/Footer";
 import WaitlistModal from "./components/WaitlistModal";
 import ThreeBackground from "./components/ThreeBackground";
+import DashboardLayout from "./components/dashboard/DashboardLayout";
+import DashboardPage from "./pages/DashboardPage";
+import ClientsPage from "./pages/ClientsPage";
+import InventoryPage from "./pages/InventoryPage";
+import SequencesPage from "./pages/SequencesPage";
+import InboxPage from "./pages/InboxPage";
+import SettingsPage from "./pages/SettingsPage";
 
-function App() {
+/* ─── Landing Page ─── */
+function LandingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const openWaitlist = useCallback(() => setIsModalOpen(true), []);
   const closeWaitlist = useCallback(() => setIsModalOpen(false), []);
 
-  // Intersection Observer for scroll animations
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -50,5 +58,3 @@ function App() {
     </>
   );
 }
-
-export default App;
