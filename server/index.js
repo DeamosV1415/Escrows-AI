@@ -6,10 +6,6 @@ import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import clientSchema from "./models/Client.js";
-import inventoryItemSchema from "./models/InventoryItem.js";
-import createClientsRouter from "./routes/clients.js";
-import createInventoryRouter from "./routes/inventory.js";
 
 dotenv.config();
 
@@ -160,29 +156,6 @@ async function start() {
     console.log("✅ Connected to MongoDB — waitlist_clients");
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
-  }
-
-  // ─── Second connection for Clients DB ───
-  try {
-    const clientsConn = mongoose.createConnection(MONGODB_URI, {
-      dbName: "Clients",
-      serverSelectionTimeoutMS: 15000,
-    });
-    await clientsConn.asPromise();
-    console.log("✅ Connected to MongoDB — Clients");
-
-    const Client = clientsConn.model("Client", clientSchema, "client's data");
-    const InventoryItem = clientsConn.model(
-      "InventoryItem",
-      inventoryItemSchema,
-      "Inventory",
-    );
-
-    app.use("/api/clients", createClientsRouter(Client, InventoryItem));
-    app.use("/api/inventory", createInventoryRouter(InventoryItem));
-  } catch (err) {
-    console.error("❌ Clients DB connection failed:", err.message);
     process.exit(1);
   }
 
