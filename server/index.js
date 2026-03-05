@@ -4,7 +4,12 @@ import dotenv from "dotenv";
 import sgMail from "@sendgrid/mail";
 import mongoose from "mongoose";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
+import clientSchema from "./models/Client.js";
+import inventoryItemSchema from "./models/InventoryItem.js";
+import createClientsRouter from "./routes/clients.js";
+import createInventoryRouter from "./routes/inventory.js";
 
 dotenv.config();
 
@@ -35,6 +40,12 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@escrowsai.com";
 const TO_EMAIL =
   process.env.TO_EMAIL || process.env.FROM_EMAIL || "noreply@escrowsai.com";
 
+// ─── Read logo for email embedding ───
+const __filename_early = fileURLToPath(import.meta.url);
+const __dirname_early = path.dirname(__filename_early);
+const logoPath = path.join(__dirname_early, "..", "src", "assets", "Logo.png");
+const logoBase64 = fs.readFileSync(logoPath).toString("base64");
+
 // ─── POST /api/waitlist ───
 app.post("/api/waitlist", async (req, res) => {
   const { name, email, company } = req.body;
@@ -57,6 +68,7 @@ app.post("/api/waitlist", async (req, res) => {
       html: `
         <div style="font-family: 'Georgia', serif; max-width: 560px; margin: 0 auto; padding: 40px 24px; color: #1A1A1A;">
           <div style="text-align: center; margin-bottom: 32px;">
+            <img src="https://www.escrowsai.com/assets/Logo--Zcmh7Ka.png" alt="Escrows AI" style="width: 150px; height: 80px; border-radius: 16px; margin-bottom: 12px;" />
             <h1 style="font-size: 28px; font-weight: 500; color: #2D3A14; margin: 0;">Escrows AI</h1>
           </div>
           <h2 style="font-size: 22px; font-weight: 400; color: #1A1A1A; margin-bottom: 16px;">
@@ -125,19 +137,8 @@ app.post("/api/waitlist", async (req, res) => {
   }
 });
 
-// ─── Serve Frontend (production) ───
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distPath = path.join(__dirname, "..", "dist");
-
-app.use(express.static(distPath));
-
-// SPA fallback — serve index.html for any non-API route
-app.get("/{*splat}", (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
-
 // ─── Start server only after MongoDB connects ───
+const distPath = path.join(__dirname_early, "..", "dist");
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -154,13 +155,42 @@ async function start() {
   try {
     await mongoose.connect(MONGODB_URI, {
       dbName: "waitlist_clients",
-      serverSelectionTimeoutMS: 15000, // fail faster with clear error
+      serverSelectionTimeoutMS: 15000,
     });
     console.log("✅ Connected to MongoDB — waitlist_clients");
   } catch (err) {
     console.error("❌ MongoDB connection failed:", err.message);
     process.exit(1);
   }
+
+  // ─── Second connection for Clients DB ───
+  try {
+    const clientsConn = mongoose.createConnection(MONGODB_URI, {
+      dbName: "Clients",
+      serverSelectionTimeoutMS: 15000,
+    });
+    await clientsConn.asPromise();
+    console.log("✅ Connected to MongoDB — Clients");
+
+    const Client = clientsConn.model("Client", clientSchema, "client's data");
+    const InventoryItem = clientsConn.model(
+      "InventoryItem",
+      inventoryItemSchema,
+      "Inventory",
+    );
+
+    app.use("/api/clients", createClientsRouter(Client, InventoryItem));
+    app.use("/api/inventory", createInventoryRouter(InventoryItem));
+  } catch (err) {
+    console.error("❌ Clients DB connection failed:", err.message);
+    process.exit(1);
+  }
+
+  // ─── Serve Frontend (production) — AFTER all API routes ───
+  app.use(express.static(distPath));
+  app.get("/{*splat}", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
 
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);

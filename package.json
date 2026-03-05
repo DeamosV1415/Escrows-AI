@@ -19,10 +19,14 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "mammoth": "^1.11.0",
     "mongoose": "^9.2.2",
+    "multer": "^2.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "three": "^0.183.1"
+    "react-router-dom": "^7.13.1",
+    "three": "^0.183.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
