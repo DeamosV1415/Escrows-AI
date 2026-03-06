@@ -36,11 +36,11 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@escrowsai.com";
 const TO_EMAIL =
   process.env.TO_EMAIL || process.env.FROM_EMAIL || "noreply@escrowsai.com";
 
-// ─── Read logo for email embedding ───
 const __filename_early = fileURLToPath(import.meta.url);
 const __dirname_early = path.dirname(__filename_early);
-const logoPath = path.join(__dirname_early, "..", "src", "assets", "Logo.png");
-const logoBase64 = fs.readFileSync(logoPath).toString("base64");
+
+// Logo URL — served from /public (no Vite hash, stable URL)
+const LOGO_URL = "https://www.escrowsai.com/Logo.png";
 
 // ─── POST /api/waitlist ───
 app.post("/api/waitlist", async (req, res) => {
@@ -64,7 +64,7 @@ app.post("/api/waitlist", async (req, res) => {
       html: `
         <div style="font-family: 'Georgia', serif; max-width: 560px; margin: 0 auto; padding: 40px 24px; color: #1A1A1A;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <img src="https://www.escrowsai.com/assets/Logo--Zcmh7Ka.png" alt="Escrows AI" style="width: 150px; height: 80px; border-radius: 16px; margin-bottom: 12px;" />
+            <img src="${LOGO_URL}" alt="Escrows AI" style="width: 150px; height: 80px; border-radius: 16px; margin-bottom: 12px;" />
             <h1 style="font-size: 28px; font-weight: 500; color: #2D3A14; margin: 0;">Escrows AI</h1>
           </div>
           <h2 style="font-size: 22px; font-weight: 400; color: #1A1A1A; margin-bottom: 16px;">
@@ -100,6 +100,9 @@ app.post("/api/waitlist", async (req, res) => {
       subject: `New Waitlist Signup: ${name}`,
       html: `
         <div style="font-family: sans-serif; padding: 24px; color: #1A1A1A;">
+          <div style="margin-bottom: 20px;">
+            <img src="${LOGO_URL}" alt="Escrows AI" style="width: 90px; height: 64px; border-radius: 12px;" />
+          </div>
           <h2 style="margin-top: 0;">New Waitlist Signup</h2>
           <table style="border-collapse: collapse; width: 100%;">
             <tr><td style="padding: 8px 0; font-weight: bold; width: 100px;">Name:</td><td>${name}</td></tr>
