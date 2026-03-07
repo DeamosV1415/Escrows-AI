@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import "./InventoryPage.css";
+import { authFetch } from "../utils/authFetch";
 
 /* ─── Types ─── */
 interface InventoryItem {
@@ -26,13 +27,13 @@ const API = "/api/inventory";
 
 async function fetchItems(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${API}?${qs}`);
+  const res = await authFetch(`${API}?${qs}`);
   if (!res.ok) throw new Error("Failed to fetch inventory");
   return res.json();
 }
 
 async function fetchAncestors(id: string): Promise<Crumb[]> {
-  const res = await fetch(`${API}/${id}/ancestors`);
+  const res = await authFetch(`${API}/${id}/ancestors`);
   if (!res.ok) throw new Error("Failed to fetch ancestors");
   return res.json();
 }
@@ -42,7 +43,7 @@ async function createFolder(data: {
   name: string;
   parentId?: string | null;
 }) {
-  const res = await fetch(`${API}/folder`, {
+  const res = await authFetch(`${API}/folder`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -52,7 +53,7 @@ async function createFolder(data: {
 }
 
 async function uploadFile(formData: FormData) {
-  const res = await fetch(`${API}/upload`, {
+  const res = await authFetch(`${API}/upload`, {
     method: "POST",
     body: formData,
   });
@@ -61,7 +62,7 @@ async function uploadFile(formData: FormData) {
 }
 
 async function renameItem(id: string, name: string) {
-  const res = await fetch(`${API}/${id}`, {
+  const res = await authFetch(`${API}/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -71,7 +72,7 @@ async function renameItem(id: string, name: string) {
 }
 
 async function deleteItem(id: string) {
-  const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+  const res = await authFetch(`${API}/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete");
   return res.json();
 }
@@ -80,7 +81,7 @@ async function fetchCounts(
   parentIds: string[],
 ): Promise<Record<string, { files: number; folders: number }>> {
   if (parentIds.length === 0) return {};
-  const res = await fetch(`${API}/counts?parentIds=${parentIds.join(",")}`);
+  const res = await authFetch(`${API}/counts?parentIds=${parentIds.join(",")}`);
   if (!res.ok) return {};
   return res.json();
 }
@@ -411,7 +412,7 @@ const InventoryPage: React.FC = () => {
     if (!clientId && breadcrumbs.length > 0) {
       // Try fetching the root folder's clientId
       try {
-        const res = await fetch(`${API}/${breadcrumbs[0]._id}`);
+        const res = await authFetch(`${API}/${breadcrumbs[0]._id}`);
         const rootFolder = await res.json();
         clientId = rootFolder.clientId;
       } catch {}
@@ -446,7 +447,7 @@ const InventoryPage: React.FC = () => {
     let clientId = activeClientId;
     if (!clientId && breadcrumbs.length > 0) {
       try {
-        const res = await fetch(`${API}/${breadcrumbs[0]._id}`);
+        const res = await authFetch(`${API}/${breadcrumbs[0]._id}`);
         const rootFolder = await res.json();
         clientId = rootFolder.clientId;
       } catch {}
@@ -546,7 +547,7 @@ const InventoryPage: React.FC = () => {
     // For PDF, fetch as blob and create blob URL
     if (mime === "application/pdf") {
       try {
-        const res = await fetch(`${API}/${item._id}/download`);
+        const res = await authFetch(`${API}/${item._id}/download`);
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         setPdfBlobUrl(url);
@@ -560,7 +561,7 @@ const InventoryPage: React.FC = () => {
     // For Excel
     if (["xlsx", "xls"].includes(ext)) {
       try {
-        const res = await fetch(`${API}/${item._id}/download`);
+        const res = await authFetch(`${API}/${item._id}/download`);
         const buf = await res.arrayBuffer();
         const XLSX = await import("xlsx");
         const wb = XLSX.read(buf, { type: "array" });
@@ -578,7 +579,7 @@ const InventoryPage: React.FC = () => {
     // For DOCX
     if (["docx", "doc"].includes(ext)) {
       try {
-        const res = await fetch(`${API}/${item._id}/download`);
+        const res = await authFetch(`${API}/${item._id}/download`);
         const buf = await res.arrayBuffer();
         const mammoth = await import("mammoth");
         const result = await mammoth.convertToHtml({ arrayBuffer: buf });

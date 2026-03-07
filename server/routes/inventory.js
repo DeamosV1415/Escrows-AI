@@ -39,7 +39,7 @@ export default function createInventoryRouter(InventoryItem) {
   router.get("/", async (req, res) => {
     try {
       const { clientId, parentId, search } = req.query;
-      const filter = {};
+      const filter = { userId: req.userId };
 
       if (clientId) filter.clientId = new mongoose.Types.ObjectId(clientId);
 
@@ -77,7 +77,7 @@ export default function createInventoryRouter(InventoryItem) {
       const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
 
       const result = await InventoryItem.aggregate([
-        { $match: { parentId: { $in: objectIds } } },
+        { $match: { parentId: { $in: objectIds }, userId: new mongoose.Types.ObjectId(req.userId) } },
         {
           $group: {
             _id: { parentId: "$parentId", type: "$type" },
@@ -109,7 +109,7 @@ export default function createInventoryRouter(InventoryItem) {
   // ─── GET /api/inventory/:id ───
   router.get("/:id", async (req, res) => {
     try {
-      const item = await InventoryItem.findById(req.params.id).lean();
+      const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId }).lean();
       if (!item) return res.status(404).json({ error: "Item not found." });
       res.json(item);
     } catch (err) {
@@ -127,7 +127,7 @@ export default function createInventoryRouter(InventoryItem) {
 
       // Walk up the tree (max 20 levels to prevent infinite loops)
       for (let i = 0; i < 20; i++) {
-        const item = await InventoryItem.findById(currentId).lean();
+        const item = await InventoryItem.findOne({ _id: currentId, userId: req.userId }).lean();
         if (!item) break;
         ancestors.unshift({ _id: item._id, name: item.name, type: item.type });
         if (!item.parentId) break;
@@ -153,6 +153,7 @@ export default function createInventoryRouter(InventoryItem) {
       }
 
       const folder = new InventoryItem({
+        userId: req.userId,
         clientId,
         name: name.trim(),
         type: "folder",
@@ -181,6 +182,7 @@ export default function createInventoryRouter(InventoryItem) {
       }
 
       const item = new InventoryItem({
+        userId: req.userId,
         clientId,
         name: file.originalname,
         type: "file",
@@ -203,8 +205,8 @@ export default function createInventoryRouter(InventoryItem) {
   router.put("/:id", async (req, res) => {
     try {
       const { name } = req.body;
-      const item = await InventoryItem.findByIdAndUpdate(
-        req.params.id,
+      const item = await InventoryItem.findOneAndUpdate(
+        { _id: req.params.id, userId: req.userId },
         { $set: { name: name.trim() } },
         { new: true, runValidators: true },
       ).lean();
@@ -223,7 +225,7 @@ export default function createInventoryRouter(InventoryItem) {
   // Recursive delete for folders
   router.delete("/:id", async (req, res) => {
     try {
-      const item = await InventoryItem.findById(req.params.id);
+      const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId });
       if (!item) return res.status(404).json({ error: "Item not found." });
 
       if (item.type === "folder") {
@@ -233,7 +235,7 @@ export default function createInventoryRouter(InventoryItem) {
 
         while (queue.length > 0) {
           const pid = queue.shift();
-          const children = await InventoryItem.find({ parentId: pid }).lean();
+          const children = await InventoryItem.find({ parentId: pid, userId: req.userId }).lean();
           for (const child of children) {
             toDelete.push(child._id);
             if (child.type === "folder") queue.push(child._id);
@@ -257,7 +259,7 @@ export default function createInventoryRouter(InventoryItem) {
             fs.unlinkSync(item.storagePath);
           } catch {}
         }
-        await InventoryItem.findByIdAndDelete(req.params.id);
+        await InventoryItem.findOneAndDelete({ _id: req.params.id, userId: req.userId });
         console.log(`🗑️  File deleted: ${item.name}`);
       }
 
@@ -272,7 +274,7 @@ export default function createInventoryRouter(InventoryItem) {
   // Stream file for preview/download
   router.get("/:id/download", async (req, res) => {
     try {
-      const item = await InventoryItem.findById(req.params.id).lean();
+      const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId }).lean();
       if (!item || item.type !== "file") {
         return res.status(404).json({ error: "File not found." });
       }

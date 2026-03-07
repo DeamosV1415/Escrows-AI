@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./components/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import IntroVideo from "./components/IntroVideo";
@@ -16,6 +18,8 @@ import InventoryPage from "./pages/InventoryPage";
 import SequencesPage from "./pages/SequencesPage";
 import InboxPage from "./pages/InboxPage";
 import SettingsPage from "./pages/SettingsPage";
+import LoginPage from "./pages/LoginPage";
+import OnboardingPage from "./pages/OnboardingPage";
 
 /* ─── Landing Page ─── */
 function LandingPage() {
@@ -62,22 +66,37 @@ function LandingPage() {
 /* ─── App ─── */
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Landing page */}
-        <Route path="/" element={<LandingPage />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Landing page */}
+          <Route path="/" element={<LandingPage />} />
 
-        {/* Dashboard (product) */}
-        <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="clients" element={<ClientsPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="sequences" element={<SequencesPage />} />
-          <Route path="inbox" element={<InboxPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          {/* Login / Signup */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Onboarding profile form */}
+          <Route path="/onboarding" element={<OnboardingPage />} />
+
+          {/* Dashboard (protected) */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="clients" element={<ClientsPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="sequences" element={<SequencesPage />} />
+            <Route path="inbox" element={<InboxPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

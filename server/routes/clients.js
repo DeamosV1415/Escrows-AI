@@ -8,7 +8,7 @@ export default function createClientsRouter(Client, InventoryItem) {
   router.get("/", async (req, res) => {
     try {
       const { search, stage, intent, sort } = req.query;
-      const filter = {};
+      const filter = { userId: req.userId };
 
       // Search by name, email, or company
       if (search && search.trim()) {
@@ -65,6 +65,7 @@ export default function createClientsRouter(Client, InventoryItem) {
       }
 
       const client = new Client({
+        userId: req.userId,
         name,
         email,
         company,
@@ -85,6 +86,7 @@ export default function createClientsRouter(Client, InventoryItem) {
         try {
           const folderName = company ? `${name} - ${company}` : name;
           const folder = new InventoryItem({
+            userId: req.userId,
             clientId: client._id,
             name: folderName,
             type: "folder",
@@ -112,8 +114,8 @@ export default function createClientsRouter(Client, InventoryItem) {
   router.put("/:id", async (req, res) => {
     try {
       const updates = req.body;
-      const client = await Client.findByIdAndUpdate(
-        req.params.id,
+      const client = await Client.findOneAndUpdate(
+        { _id: req.params.id, userId: req.userId },
         { $set: updates },
         { new: true, runValidators: true },
       ).lean();
@@ -129,7 +131,7 @@ export default function createClientsRouter(Client, InventoryItem) {
             ? `${client.name} - ${client.company}`
             : client.name;
           await InventoryItem.findOneAndUpdate(
-            { clientId: client._id, parentId: null, type: "folder" },
+            { clientId: client._id, parentId: null, type: "folder", userId: req.userId },
             { $set: { name: folderName } },
           );
           console.log(`🔄 Inventory folder synced: ${folderName}`);
@@ -149,7 +151,7 @@ export default function createClientsRouter(Client, InventoryItem) {
   // ─── DELETE /api/clients/:id ───
   router.delete("/:id", async (req, res) => {
     try {
-      const client = await Client.findByIdAndDelete(req.params.id);
+      const client = await Client.findOneAndDelete({ _id: req.params.id, userId: req.userId });
 
       if (!client) {
         return res.status(404).json({ error: "Client not found." });
@@ -160,6 +162,7 @@ export default function createClientsRouter(Client, InventoryItem) {
         try {
           const items = await InventoryItem.find({
             clientId: client._id,
+            userId: req.userId,
           }).lean();
           // Delete physical files from disk
           for (const item of items) {
@@ -172,6 +175,7 @@ export default function createClientsRouter(Client, InventoryItem) {
           }
           const result = await InventoryItem.deleteMany({
             clientId: client._id,
+            userId: req.userId,
           });
           console.log(
             `🗑️  Cascade deleted ${result.deletedCount} inventory items for: ${client.name}`,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./ClientsPage.css";
+import { authFetch } from "../utils/authFetch";
 import ClientModal from "../components/dashboard/ClientModal";
 import ClientDetailModal from "../components/dashboard/ClientDetailModal";
 
@@ -40,13 +41,13 @@ const API = "/api/clients";
 
 async function fetchClients(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${API}?${qs}`);
+  const res = await authFetch(`${API}?${qs}`);
   if (!res.ok) throw new Error("Failed to fetch clients");
   return res.json();
 }
 
 async function createClient(data: Partial<Client>) {
-  const res = await fetch(API, {
+  const res = await authFetch(API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -56,7 +57,7 @@ async function createClient(data: Partial<Client>) {
 }
 
 async function updateClient(id: string, data: Partial<Client>) {
-  const res = await fetch(`${API}/${id}`, {
+  const res = await authFetch(`${API}/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -66,7 +67,7 @@ async function updateClient(id: string, data: Partial<Client>) {
 }
 
 async function deleteClient(id: string) {
-  const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+  const res = await authFetch(`${API}/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete client");
   return res.json();
 }

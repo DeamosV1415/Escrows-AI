@@ -1,4 +1,7 @@
-import { NavLink } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../AuthContext";
+import { authFetch } from "../../utils/authFetch";
 import "./Sidebar.css";
 import LogoImg from "../../assets/Logo.png";
 
@@ -129,10 +132,122 @@ const bottomItems = [
   },
 ];
 
+/* ─── Profile Popup ─── */
+interface ProfileData {
+  phone: string;
+  company: string;
+  jobTitle: string;
+  licenseNumber: string;
+  yearsInBusiness: string;
+  location: string;
+  specialization: string;
+  teamSize: string;
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
+  const { user, logout, updateUser } = useAuth();
+  const navigate = useNavigate();
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData>({
+    phone: "",
+    company: "",
+    jobTitle: "",
+    licenseNumber: "",
+    yearsInBusiness: "",
+    location: "",
+    specialization: "",
+    teamSize: "",
+  });
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Close popup on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setPopupOpen(false);
+        setEditMode(false);
+      }
+    };
+    if (popupOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [popupOpen]);
+
+  // Load profile data when opening edit mode
+  const openEditMode = async () => {
+    setEditMode(true);
+    try {
+      const res = await authFetch("/api/auth/me");
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setProfileData({
+          phone: data.user.phone || "",
+          company: data.user.company || "",
+          jobTitle: data.user.jobTitle || "",
+          licenseNumber: data.user.licenseNumber || "",
+          yearsInBusiness: data.user.yearsInBusiness?.toString() || "",
+          location: data.user.location || "",
+          specialization: data.user.specialization || "",
+          teamSize: data.user.teamSize || "",
+        });
+      }
+    } catch {
+      // silently fail, form will be empty
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await authFetch("/api/auth/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...profileData,
+          yearsInBusiness: profileData.yearsInBusiness
+            ? parseInt(profileData.yearsInBusiness)
+            : null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        updateUser(data.user);
+        setEditMode(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setPopupOpen(false);
+    navigate("/login", { replace: true });
+  };
+
+  // Get user initials and display name
+  const userName = user?.name || "User";
+  const initials = userName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const shortName =
+    userName.split(" ").length > 1
+      ? `${userName.split(" ")[0]} ${userName.split(" ")[1]?.[0]}.`
+      : userName;
+
+  const handleFieldChange = (field: keyof ProfileData, value: string) => {
+    setProfileData((prev) => ({ ...prev, [field]: value }));
+  };
+
   return (
     <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
-      {/* Logo area — click to expand when collapsed */}
+      {/* Logo area */}
       <div className="sidebar__header">
         <div
           className="sidebar__logo"
@@ -209,13 +324,205 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
           </NavLink>
         ))}
 
-        {/* User profile */}
-        <div className="sidebar__user">
-          <div className="sidebar__user-avatar">CB</div>
-          {!collapsed && (
-            <div className="sidebar__user-info">
-              <span className="sidebar__user-name">Chinmay B.</span>
-              <span className="sidebar__user-role">Admin</span>
+        {/* User profile — clickable */}
+        <div className="sidebar__profile-wrapper" ref={popupRef}>
+          <div
+            className="sidebar__user"
+            onClick={() => setPopupOpen(!popupOpen)}
+            title={collapsed ? userName : undefined}
+          >
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={userName}
+                className="sidebar__user-avatar sidebar__user-avatar--img"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="sidebar__user-avatar">{initials}</div>
+            )}
+            {!collapsed && (
+              <div className="sidebar__user-info">
+                <span className="sidebar__user-name">{shortName}</span>
+                <span className="sidebar__user-role">{profileData.jobTitle || user?.email || "Member"}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Context Menu (beside sidebar) */}
+          {popupOpen && !editMode && (
+            <div className="profile-menu">
+              <div className="profile-menu__header">
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={userName}
+                    className="profile-menu__avatar profile-menu__avatar--img"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="profile-menu__avatar">{initials}</div>
+                )}
+                <div>
+                  <div className="profile-menu__name">{userName}</div>
+                  <div className="profile-menu__email">{user?.email}</div>
+                </div>
+              </div>
+
+              <div className="profile-menu__divider" />
+
+              <button
+                className="profile-menu__btn"
+                onClick={openEditMode}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Edit Profile
+              </button>
+
+              <button
+                className="profile-menu__btn profile-menu__btn--logout"
+                onClick={handleLogout}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          )}
+
+          {/* Edit Profile Modal (centered full-screen) */}
+          {editMode && (
+            <div className="profile-modal-overlay">
+              <div className="profile-modal">
+                <div className="profile-modal__header">
+                  <div className="profile-modal__header-user">
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={userName}
+                        className="profile-modal__avatar"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="profile-modal__avatar-initials">{initials}</div>
+                    )}
+                    <span className="profile-modal__title">Edit Profile</span>
+                  </div>
+                  <button
+                    className="profile-modal__close"
+                    onClick={() => {
+                      setEditMode(false);
+                      setPopupOpen(false);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="profile-modal__content">
+                  <div className="profile-modal__grid">
+                    <div className="profile-field">
+                      <label>Phone</label>
+                      <input
+                        type="tel"
+                        value={profileData.phone}
+                        onChange={(e) => handleFieldChange("phone", e.target.value)}
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>Company</label>
+                      <input
+                        type="text"
+                        value={profileData.company}
+                        onChange={(e) => handleFieldChange("company", e.target.value)}
+                        placeholder="Your brokerage or firm"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>Job Title</label>
+                      <input
+                        type="text"
+                        value={profileData.jobTitle}
+                        onChange={(e) => handleFieldChange("jobTitle", e.target.value)}
+                        placeholder="e.g. Real Estate Agent"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>License Number</label>
+                      <input
+                        type="text"
+                        value={profileData.licenseNumber}
+                        onChange={(e) => handleFieldChange("licenseNumber", e.target.value)}
+                        placeholder="e.g. DRE-01234567"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>Location</label>
+                      <input
+                        type="text"
+                        value={profileData.location}
+                        onChange={(e) => handleFieldChange("location", e.target.value)}
+                        placeholder="City, State"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>Years in Business</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="99"
+                        value={profileData.yearsInBusiness}
+                        onChange={(e) => handleFieldChange("yearsInBusiness", e.target.value)}
+                        placeholder="e.g. 5"
+                      />
+                    </div>
+                    <div className="profile-field">
+                      <label>Specialization</label>
+                      <select
+                        value={profileData.specialization}
+                        onChange={(e) => handleFieldChange("specialization", e.target.value)}
+                      >
+                        <option value="">Select...</option>
+                        <option value="Residential">Residential</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Land & Development">Land & Development</option>
+                        <option value="Property Management">Property Management</option>
+                        <option value="Mortgage & Lending">Mortgage & Lending</option>
+                        <option value="Title & Escrow">Title & Escrow</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div className="profile-field">
+                      <label>Team Size</label>
+                      <select
+                        value={profileData.teamSize}
+                        onChange={(e) => handleFieldChange("teamSize", e.target.value)}
+                      >
+                        <option value="">Select...</option>
+                        <option value="Solo">Solo</option>
+                        <option value="2-5">2–5 people</option>
+                        <option value="6-20">6–20 people</option>
+                        <option value="20+">20+ people</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    className="profile-modal__save"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

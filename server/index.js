@@ -8,8 +8,11 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import clientSchema from "./models/Client.js";
 import inventoryItemSchema from "./models/InventoryItem.js";
+import userSchema from "./models/User.js";
 import createClientsRouter from "./routes/clients.js";
 import createInventoryRouter from "./routes/inventory.js";
+import createAuthRouter from "./routes/auth.js";
+import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
 
@@ -148,6 +151,11 @@ async function start() {
     process.exit(1);
   }
 
+  if (!process.env.JWT_SECRET) {
+    console.error("❌ JWT_SECRET environment variable is not set!");
+    process.exit(1);
+  }
+
   // Log redacted URI for debugging
   const redacted = MONGODB_URI.replace(/:([^@]+)@/, ":****@");
   console.log(`🔗 Connecting to MongoDB: ${redacted}`);
@@ -163,7 +171,7 @@ async function start() {
     process.exit(1);
   }
 
-  // ─── Second connection for Clients DB ───
+  // ─── Second connection for Clients DB (Users, Clients, Inventory) ───
   try {
     const clientsConn = mongoose.createConnection(MONGODB_URI, {
       dbName: "Clients",
@@ -172,6 +180,7 @@ async function start() {
     await clientsConn.asPromise();
     console.log("✅ Connected to MongoDB — Clients");
 
+    const User = clientsConn.model("User", userSchema, "Users");
     const Client = clientsConn.model("Client", clientSchema, "client's data");
     const InventoryItem = clientsConn.model(
       "InventoryItem",
@@ -179,8 +188,9 @@ async function start() {
       "Inventory",
     );
 
-    app.use("/api/clients", createClientsRouter(Client, InventoryItem));
-    app.use("/api/inventory", createInventoryRouter(InventoryItem));
+    app.use("/api/auth", createAuthRouter(User));
+    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem));
+    app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem));
   } catch (err) {
     console.error("❌ Clients DB connection failed:", err.message);
     process.exit(1);

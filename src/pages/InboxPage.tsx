@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import "./InboxPage.css";
 
 /* ─── Types ─── */
@@ -24,6 +24,15 @@ interface Conversation {
   unread: number;
   priority: boolean;
   messages: Message[];
+}
+
+interface TrackedContact {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  source: "client" | "imported";
+  channels: { gmail: boolean; whatsapp: boolean; sms: boolean };
 }
 
 /* ─── Mock Data ─── */
@@ -177,7 +186,8 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     contactName: "Priya Sharma",
     contactPhone: "+1 (555) 345-6789",
     channel: "whatsapp",
-    lastMessage: "The 3BR in Maple Ridge is perfect. Let's make an offer.",
+    lastMessage:
+      "The 3BR in Maple Ridge is perfect. Let's make an offer.",
     lastTime: "3h ago",
     unread: 3,
     priority: true,
@@ -225,7 +235,8 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     contactName: "David Park",
     contactEmail: "david.park@realtycorp.com",
     channel: "gmail",
-    lastMessage: "Inspection report is attached. A few items need attention.",
+    lastMessage:
+      "Inspection report is attached. A few items need attention.",
     lastTime: "5h ago",
     unread: 1,
     priority: false,
@@ -250,7 +261,8 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     contactName: "Lisa Wang",
     contactPhone: "+1 (555) 901-2345",
     channel: "sms",
-    lastMessage: "Can you check if there are any new listings in Oakwood?",
+    lastMessage:
+      "Can you check if there are any new listings in Oakwood?",
     lastTime: "Yesterday",
     unread: 0,
     priority: false,
@@ -280,7 +292,8 @@ const MOCK_CONVERSATIONS: Conversation[] = [
     contactName: "Robert Kim",
     contactPhone: "+1 (555) 567-8901",
     channel: "whatsapp",
-    lastMessage: "Sent the signed documents via DocuSign. Please confirm.",
+    lastMessage:
+      "Sent the signed documents via DocuSign. Please confirm.",
     lastTime: "Yesterday",
     unread: 0,
     priority: false,
@@ -313,6 +326,107 @@ const MOCK_CONVERSATIONS: Conversation[] = [
   },
 ];
 
+/* ─── Mock Tracked Contacts ─── */
+
+const MOCK_TRACKED_CONTACTS: TrackedContact[] = [
+  {
+    id: "tc1",
+    name: "Sarah Mitchell",
+    email: "sarah.m@luxeproperties.com",
+    phone: "+1 (555) 123-4567",
+    source: "client",
+    channels: { gmail: true, whatsapp: false, sms: false },
+  },
+  {
+    id: "tc2",
+    name: "James Rodriguez",
+    email: "james.r@outlook.com",
+    phone: "+1 (555) 234-5678",
+    source: "client",
+    channels: { gmail: false, whatsapp: true, sms: false },
+  },
+  {
+    id: "tc3",
+    name: "Emily Chen",
+    email: "emily.chen@gmail.com",
+    phone: "+1 (555) 345-6789",
+    source: "client",
+    channels: { gmail: true, whatsapp: false, sms: false },
+  },
+  {
+    id: "tc4",
+    name: "Michael Torres",
+    email: "m.torres@email.com",
+    phone: "+1 (555) 876-5432",
+    source: "client",
+    channels: { gmail: false, whatsapp: false, sms: true },
+  },
+  {
+    id: "tc5",
+    name: "Priya Sharma",
+    email: "priya.sharma@hotmail.com",
+    phone: "+1 (555) 345-6789",
+    source: "client",
+    channels: { gmail: false, whatsapp: true, sms: false },
+  },
+  {
+    id: "tc6",
+    name: "David Park",
+    email: "david.park@realtycorp.com",
+    phone: "+1 (555) 456-7890",
+    source: "imported",
+    channels: { gmail: true, whatsapp: false, sms: false },
+  },
+  {
+    id: "tc7",
+    name: "Lisa Wang",
+    email: "lisa.wang@gmail.com",
+    phone: "+1 (555) 901-2345",
+    source: "imported",
+    channels: { gmail: false, whatsapp: false, sms: true },
+  },
+  {
+    id: "tc8",
+    name: "Robert Kim",
+    email: "robert.kim@yahoo.com",
+    phone: "+1 (555) 567-8901",
+    source: "client",
+    channels: { gmail: false, whatsapp: true, sms: false },
+  },
+  {
+    id: "tc9",
+    name: "Angela Martinez",
+    email: "angela.m@protonmail.com",
+    phone: "+1 (555) 678-9012",
+    source: "imported",
+    channels: { gmail: true, whatsapp: true, sms: false },
+  },
+  {
+    id: "tc10",
+    name: "Kevin Brooks",
+    email: "kevin.b@gmail.com",
+    phone: "+1 (555) 789-0123",
+    source: "imported",
+    channels: { gmail: true, whatsapp: false, sms: true },
+  },
+  {
+    id: "tc11",
+    name: "Rachel Green",
+    email: "rachel.g@realestate.com",
+    phone: "+1 (555) 890-1234",
+    source: "client",
+    channels: { gmail: true, whatsapp: true, sms: false },
+  },
+  {
+    id: "tc12",
+    name: "Tom Henderson",
+    email: "tom.h@outlook.com",
+    phone: "+1 (555) 012-3456",
+    source: "imported",
+    channels: { gmail: false, whatsapp: false, sms: true },
+  },
+];
+
 /* ─── Channel helpers ─── */
 
 const CHANNEL_LABELS: Record<Channel, string> = {
@@ -333,16 +447,7 @@ function getInitials(name: string) {
 /* ─── Icon components ─── */
 
 const GmailMiniIcon = () => (
-  <svg
-    width="10"
-    height="10"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
     <polyline points="22,6 12,13 2,6" />
   </svg>
@@ -355,16 +460,7 @@ const WhatsAppMiniIcon = () => (
 );
 
 const SmsMiniIcon = () => (
-  <svg
-    width="10"
-    height="10"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
   </svg>
 );
@@ -388,8 +484,15 @@ const InboxPage: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
   const [showConnectModal, setShowConnectModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Contacts panel
+  const [showContactsPanel, setShowContactsPanel] = useState(false);
+  const [contactsTab, setContactsTab] = useState<"tracked" | "import">("tracked");
+  const [contactsSearch, setContactsSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "client" | "imported">("all");
   const [importDragOver, setImportDragOver] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(680);
+  const isResizing = useRef(false);
 
   const [connections, setConnections] = useState({
     gmail: true,
@@ -402,12 +505,12 @@ const InboxPage: React.FC = () => {
 
   /* ─── Listen for header button events ─── */
   useEffect(() => {
-    const onImport = () => setShowImportModal(true);
+    const onContacts = () => setShowContactsPanel(true);
     const onConnect = () => setShowConnectModal(true);
-    window.addEventListener("inbox-import", onImport);
+    window.addEventListener("inbox-contacts", onContacts);
     window.addEventListener("inbox-connect", onConnect);
     return () => {
-      window.removeEventListener("inbox-import", onImport);
+      window.removeEventListener("inbox-contacts", onContacts);
       window.removeEventListener("inbox-connect", onConnect);
     };
   }, []);
@@ -427,7 +530,7 @@ const InboxPage: React.FC = () => {
         (c) =>
           c.contactName.toLowerCase().includes(q) ||
           c.lastMessage.toLowerCase().includes(q) ||
-          (c.contactEmail && c.contactEmail.toLowerCase().includes(q)),
+          (c.contactEmail && c.contactEmail.toLowerCase().includes(q))
       );
     }
     return list;
@@ -445,12 +548,64 @@ const InboxPage: React.FC = () => {
     };
   }, [conversations]);
 
+  // Filtered tracked contacts
+  const filteredContacts = useMemo(() => {
+    let list = MOCK_TRACKED_CONTACTS;
+    if (sourceFilter !== "all") {
+      list = list.filter((c) => c.source === sourceFilter);
+    }
+    if (contactsSearch.trim()) {
+      const q = contactsSearch.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.phone.includes(q)
+      );
+    }
+    return list;
+  }, [contactsSearch, sourceFilter]);
+
+  const sourceCounts = useMemo(() => ({
+    all: MOCK_TRACKED_CONTACTS.length,
+    client: MOCK_TRACKED_CONTACTS.filter((c) => c.source === "client").length,
+    imported: MOCK_TRACKED_CONTACTS.filter((c) => c.source === "imported").length,
+  }), []);
+
+  // Resize handler
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = startX - ev.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 400), window.innerWidth * 0.9);
+      setPanelWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isResizing.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [panelWidth]);
+
   /* ─── Handlers ─── */
 
   const openChat = (id: string) => {
     setActiveChat(id);
     setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)),
+      prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c))
     );
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -479,8 +634,8 @@ const InboxPage: React.FC = () => {
               lastMessage: newMsg.text,
               lastTime: "Just now",
             }
-          : c,
-      ),
+          : c
+      )
     );
     setReplyText("");
     setTimeout(() => {
@@ -502,7 +657,7 @@ const InboxPage: React.FC = () => {
   /* ─── Render ─── */
   return (
     <div className="inbox">
-      {/* ── Top Bar (title only — buttons are in dashboard header) ── */}
+      {/* ── Top Bar ── */}
       <div className="inbox__topbar">
         <div className="inbox__topbar-left">
           <h1 className="inbox__title">Inbox</h1>
@@ -521,16 +676,7 @@ const InboxPage: React.FC = () => {
           <div className="inbox__list-header">
             {/* Search */}
             <div className="inbox__search">
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -568,7 +714,7 @@ const InboxPage: React.FC = () => {
                 className={`inbox__filter-pill inbox__filter-pill--whatsapp ${channelFilter === "whatsapp" ? "inbox__filter-pill--active" : ""}`}
                 onClick={() =>
                   setChannelFilter(
-                    channelFilter === "whatsapp" ? "all" : "whatsapp",
+                    channelFilter === "whatsapp" ? "all" : "whatsapp"
                   )
                 }
               >
@@ -597,10 +743,7 @@ const InboxPage: React.FC = () => {
           {/* Chat Items */}
           <div className="inbox__chats">
             {filtered.length === 0 ? (
-              <div
-                className="inbox__empty"
-                style={{ background: "transparent", padding: "40px 16px" }}
-              >
+              <div className="inbox__empty" style={{ background: "transparent", padding: "40px 16px" }}>
                 <p style={{ fontSize: "0.82rem" }}>No conversations found</p>
               </div>
             ) : (
@@ -610,34 +753,21 @@ const InboxPage: React.FC = () => {
                   className={`inbox__chat-item ${activeChat === conv.id ? "inbox__chat-item--active" : ""} ${conv.unread > 0 ? "inbox__chat-item--unread" : ""}`}
                   onClick={() => openChat(conv.id)}
                 >
-                  {/* Avatar */}
-                  <div
-                    className={`inbox__chat-avatar inbox__chat-avatar--${conv.channel}`}
-                  >
+                  <div className={`inbox__chat-avatar inbox__chat-avatar--${conv.channel}`}>
                     {getInitials(conv.contactName)}
-                    <div
-                      className={`inbox__avatar-channel inbox__avatar-channel--${conv.channel}`}
-                    >
+                    <div className={`inbox__avatar-channel inbox__avatar-channel--${conv.channel}`}>
                       {channelMiniIcons[conv.channel]}
                     </div>
                   </div>
-
-                  {/* Info */}
                   <div className="inbox__chat-info">
                     <div className="inbox__chat-top">
-                      <span className="inbox__chat-name">
-                        {conv.contactName}
-                      </span>
+                      <span className="inbox__chat-name">{conv.contactName}</span>
                       <span className="inbox__chat-time">{conv.lastTime}</span>
                     </div>
                     <div className="inbox__chat-bottom">
-                      <span className="inbox__chat-preview">
-                        {conv.lastMessage}
-                      </span>
+                      <span className="inbox__chat-preview">{conv.lastMessage}</span>
                       {conv.unread > 0 && (
-                        <span className="inbox__chat-unread-badge">
-                          {conv.unread}
-                        </span>
+                        <span className="inbox__chat-unread-badge">{conv.unread}</span>
                       )}
                     </div>
                   </div>
@@ -650,37 +780,20 @@ const InboxPage: React.FC = () => {
         {/* ── Right: Conversation or Empty ── */}
         {activeConv ? (
           <div className="inbox__conversation">
-            {/* Conversation Header */}
             <div className="inbox__conv-header">
               <div className="inbox__conv-header-left">
-                <button
-                  className="inbox__mobile-back"
-                  onClick={() => setActiveChat(null)}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                <button className="inbox__mobile-back" onClick={() => setActiveChat(null)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                 </button>
-                <div
-                  className={`inbox__conv-avatar inbox__conv-avatar--${activeConv.channel}`}
-                >
+                <div className={`inbox__conv-avatar inbox__conv-avatar--${activeConv.channel}`}>
                   {getInitials(activeConv.contactName)}
                 </div>
                 <div className="inbox__conv-info">
                   <h3>{activeConv.contactName}</h3>
                   <div className="inbox__conv-meta">
-                    <span
-                      className={`inbox__channel-badge inbox__channel-badge--${activeConv.channel}`}
-                    >
+                    <span className={`inbox__channel-badge inbox__channel-badge--${activeConv.channel}`}>
                       {CHANNEL_LABELS[activeConv.channel]}
                     </span>
                     <span className="inbox__conv-email">
@@ -691,46 +804,19 @@ const InboxPage: React.FC = () => {
               </div>
               <div className="inbox__conv-actions">
                 <button className="inbox__conv-action-btn" title="Star">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 </button>
                 <button className="inbox__conv-action-btn" title="Archive">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="21 8 21 21 3 21 3 8" />
                     <rect x="1" y="3" width="22" height="5" />
                     <line x1="10" y1="12" x2="14" y2="12" />
                   </svg>
                 </button>
                 <button className="inbox__conv-action-btn" title="More">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="1" />
                     <circle cx="19" cy="12" r="1" />
                     <circle cx="5" cy="12" r="1" />
@@ -739,20 +825,12 @@ const InboxPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="inbox__messages">
-              <div className="inbox__date-sep">
-                <span>Today</span>
-              </div>
+              <div className="inbox__date-sep"><span>Today</span></div>
               {activeConv.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`inbox__msg inbox__msg--${msg.sent ? "sent" : "received"}`}
-                >
+                <div key={msg.id} className={`inbox__msg inbox__msg--${msg.sent ? "sent" : "received"}`}>
                   <div className="inbox__msg-bubble">
-                    {msg.subject && (
-                      <span className="inbox__msg-subject">{msg.subject}</span>
-                    )}
+                    {msg.subject && <span className="inbox__msg-subject">{msg.subject}</span>}
                     {msg.text}
                   </div>
                   <span className="inbox__msg-time">{msg.time}</span>
@@ -761,17 +839,12 @@ const InboxPage: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Reply Composer */}
             <div className="inbox__composer">
               <div className="inbox__composer-channel">
-                <span
-                  className={`inbox__composer-channel-dot inbox__composer-channel-dot--${activeConv.channel}`}
-                />
+                <span className={`inbox__composer-channel-dot inbox__composer-channel-dot--${activeConv.channel}`} />
                 Replying via {CHANNEL_LABELS[activeConv.channel]}
                 {activeConv.contactEmail && ` · ${activeConv.contactEmail}`}
-                {activeConv.contactPhone &&
-                  !activeConv.contactEmail &&
-                  ` · ${activeConv.contactPhone}`}
+                {activeConv.contactPhone && !activeConv.contactEmail && ` · ${activeConv.contactPhone}`}
               </div>
               <div className="inbox__composer-row">
                 <textarea
@@ -782,21 +855,8 @@ const InboxPage: React.FC = () => {
                   onKeyDown={handleKeyDown}
                   rows={1}
                 />
-                <button
-                  className="inbox__send-btn"
-                  onClick={handleSend}
-                  title="Send"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                <button className="inbox__send-btn" onClick={handleSend} title="Send">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13" />
                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
@@ -805,55 +865,27 @@ const InboxPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Empty State */
           <div className="inbox__empty">
             <div className="inbox__empty-icon">
-              <svg
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
             </div>
             <h3>Select a Conversation</h3>
-            <p>
-              Choose a conversation from the list to view messages and reply
-              through the same channel.
-            </p>
+            <p>Choose a conversation from the list to view messages and reply through the same channel.</p>
           </div>
         )}
       </div>
 
       {/* ═══ Connect Apps Modal ═══ */}
       {showConnectModal && (
-        <div
-          className="inbox__modal-overlay"
-          onClick={() => setShowConnectModal(false)}
-        >
+        <div className="inbox__modal-overlay" onClick={() => setShowConnectModal(false)}>
           <div className="inbox__modal" onClick={(e) => e.stopPropagation()}>
             <div className="inbox__modal-header">
               <h2>Connect Apps</h2>
-              <button
-                className="inbox__modal-close"
-                onClick={() => setShowConnectModal(false)}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+              <button className="inbox__modal-close" onClick={() => setShowConnectModal(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -863,96 +895,49 @@ const InboxPage: React.FC = () => {
               {/* Gmail */}
               <div className="inbox__connection">
                 <div className="inbox__connection-icon inbox__connection-icon--gmail">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                     <polyline points="22,6 12,13 2,6" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">Gmail</span>
-                  <span className="inbox__connection-desc">
-                    Connect your Google account to send and receive emails
-                  </span>
+                  <span className="inbox__connection-desc">Connect your Google account to send and receive emails</span>
                 </div>
                 <label className="inbox__toggle">
-                  <input
-                    type="checkbox"
-                    checked={connections.gmail}
-                    onChange={() => toggleConnection("gmail")}
-                  />
+                  <input type="checkbox" checked={connections.gmail} onChange={() => toggleConnection("gmail")} />
                   <span className="inbox__toggle-slider" />
                 </label>
               </div>
-
               {/* WhatsApp */}
               <div className="inbox__connection">
                 <div className="inbox__connection-icon inbox__connection-icon--whatsapp">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">WhatsApp</span>
-                  <span className="inbox__connection-desc">
-                    Connect WhatsApp Business to message your clients
-                  </span>
+                  <span className="inbox__connection-desc">Connect WhatsApp Business to message your clients</span>
                 </div>
                 <label className="inbox__toggle">
-                  <input
-                    type="checkbox"
-                    checked={connections.whatsapp}
-                    onChange={() => toggleConnection("whatsapp")}
-                  />
+                  <input type="checkbox" checked={connections.whatsapp} onChange={() => toggleConnection("whatsapp")} />
                   <span className="inbox__toggle-slider" />
                 </label>
               </div>
-
               {/* SMS */}
               <div className="inbox__connection">
                 <div className="inbox__connection-icon inbox__connection-icon--sms">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">SMS</span>
-                  <span className="inbox__connection-desc">
-                    Send and receive text messages via Twilio integration
-                  </span>
+                  <span className="inbox__connection-desc">Send and receive text messages via Twilio integration</span>
                 </div>
                 <label className="inbox__toggle">
-                  <input
-                    type="checkbox"
-                    checked={connections.sms}
-                    onChange={() => toggleConnection("sms")}
-                  />
+                  <input type="checkbox" checked={connections.sms} onChange={() => toggleConnection("sms")} />
                   <span className="inbox__toggle-slider" />
                 </label>
               </div>
@@ -961,95 +946,224 @@ const InboxPage: React.FC = () => {
         </div>
       )}
 
-      {/* ═══ Import Contacts Modal ═══ */}
-      {showImportModal && (
-        <div
-          className="inbox__modal-overlay"
-          onClick={() => setShowImportModal(false)}
-        >
-          <div className="inbox__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="inbox__modal-header">
-              <h2>Import Contacts</h2>
+      {/* ═══ Contacts Panel (Slide-out) ═══ */}
+      {showContactsPanel && (
+        <>
+          <div
+            className="inbox__contacts-overlay"
+            onClick={() => setShowContactsPanel(false)}
+          />
+          <div className="inbox__contacts-panel" style={{ width: panelWidth }}>
+            {/* Resize Handle */}
+            <div
+              className="inbox__contacts-resize"
+              onMouseDown={handleResizeStart}
+            />
+            {/* Panel Header */}
+            <div className="inbox__contacts-header">
+              <h2>Contacts</h2>
               <button
-                className="inbox__modal-close"
-                onClick={() => setShowImportModal(false)}
+                className="inbox__contacts-close"
+                onClick={() => setShowContactsPanel(false)}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
-            <div className="inbox__modal-body">
-              <div
-                className={`inbox__import-zone ${importDragOver ? "inbox__import-zone--dragover" : ""}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setImportDragOver(true);
-                }}
-                onDragLeave={() => setImportDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setImportDragOver(false);
-                }}
-                onClick={() => fileInputRef.current?.click()}
+
+            {/* Tabs */}
+            <div className="inbox__contacts-tabs">
+              <button
+                className={`inbox__contacts-tab ${contactsTab === "tracked" ? "inbox__contacts-tab--active" : ""}`}
+                onClick={() => setContactsTab("tracked")}
               >
-                <div className="inbox__import-zone-icon">
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                Tracked
+                <span className="inbox__contacts-tab-count">
+                  {MOCK_TRACKED_CONTACTS.length}
+                </span>
+              </button>
+              <button
+                className={`inbox__contacts-tab ${contactsTab === "import" ? "inbox__contacts-tab--active" : ""}`}
+                onClick={() => setContactsTab("import")}
+              >
+                Import
+              </button>
+            </div>
+
+            {/* Panel Body */}
+            <div className="inbox__contacts-body">
+              {contactsTab === "tracked" ? (
+                <>
+                  {/* Search + Count */}
+                  <div className="inbox__contacts-toolbar">
+                    <div className="inbox__contacts-search">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search contacts..."
+                        value={contactsSearch}
+                        onChange={(e) => setContactsSearch(e.target.value)}
+                      />
+                    </div>
+                    <span className="inbox__contacts-count-label">
+                      {filteredContacts.length} contact{filteredContacts.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Source Filter Pills */}
+                  <div className="inbox__contacts-filters">
+                    <button
+                      className={`inbox__contacts-filter-pill ${sourceFilter === "all" ? "inbox__contacts-filter-pill--active" : ""}`}
+                      onClick={() => setSourceFilter("all")}
+                    >
+                      All <span>{sourceCounts.all}</span>
+                    </button>
+                    <button
+                      className={`inbox__contacts-filter-pill inbox__contacts-filter-pill--client ${sourceFilter === "client" ? "inbox__contacts-filter-pill--active" : ""}`}
+                      onClick={() => setSourceFilter("client")}
+                    >
+                      Clients <span>{sourceCounts.client}</span>
+                    </button>
+                    <button
+                      className={`inbox__contacts-filter-pill inbox__contacts-filter-pill--imported ${sourceFilter === "imported" ? "inbox__contacts-filter-pill--active" : ""}`}
+                      onClick={() => setSourceFilter("imported")}
+                    >
+                      Imported <span>{sourceCounts.imported}</span>
+                    </button>
+                  </div>
+
+                  {/* Contacts Table */}
+                  {filteredContacts.length === 0 ? (
+                    <div className="inbox__contacts-empty">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                      </svg>
+                      <p>No contacts match your search</p>
+                    </div>
+                  ) : (
+                    <table className="inbox__contacts-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Source</th>
+                          <th>Channels</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredContacts.map((contact) => (
+                          <tr key={contact.id}>
+                            <td>
+                              <div className="inbox__contact-name-cell">
+                                <div className="inbox__contact-mini-avatar">
+                                  {getInitials(contact.name)}
+                                </div>
+                                <span className="inbox__contact-name-text">
+                                  {contact.name}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                              {contact.email}
+                            </td>
+                            <td style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                              {contact.phone}
+                            </td>
+                            <td>
+                              <span
+                                className={`inbox__source-badge inbox__source-badge--${contact.source}`}
+                              >
+                                {contact.source === "client" ? "Client" : "Imported"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="inbox__contact-channels">
+                                <div
+                                  className={`inbox__contact-channel-dot ${contact.channels.gmail ? "inbox__contact-channel-dot--gmail" : "inbox__contact-channel-dot--inactive"}`}
+                                  title="Gmail"
+                                >
+                                  <GmailMiniIcon />
+                                </div>
+                                <div
+                                  className={`inbox__contact-channel-dot ${contact.channels.whatsapp ? "inbox__contact-channel-dot--whatsapp" : "inbox__contact-channel-dot--inactive"}`}
+                                  title="WhatsApp"
+                                >
+                                  <WhatsAppMiniIcon />
+                                </div>
+                                <div
+                                  className={`inbox__contact-channel-dot ${contact.channels.sms ? "inbox__contact-channel-dot--sms" : "inbox__contact-channel-dot--inactive"}`}
+                                  title="SMS"
+                                >
+                                  <SmsMiniIcon />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </>
+              ) : (
+                /* ── Import Tab ── */
+                <>
+                  <div
+                    className={`inbox__import-zone ${importDragOver ? "inbox__import-zone--dragover" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setImportDragOver(true);
+                    }}
+                    onDragLeave={() => setImportDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setImportDragOver(false);
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                </div>
-                <h4>
-                  Drag & drop your file, or <span>browse</span>
-                </h4>
-                <p>Upload a CSV or Excel file with your contacts</p>
+                    <div className="inbox__import-zone-icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </div>
+                    <h4>
+                      Drag & drop your file, or <span>browse</span>
+                    </h4>
+                    <p>Upload a CSV or Excel file with your contacts</p>
+                    <div className="inbox__import-formats">
+                      <span className="inbox__import-format-tag">.csv</span>
+                      <span className="inbox__import-format-tag">.xlsx</span>
+                      <span className="inbox__import-format-tag">.xls</span>
+                    </div>
+                  </div>
 
-                <div className="inbox__import-formats">
-                  <span className="inbox__import-format-tag">.csv</span>
-                  <span className="inbox__import-format-tag">.xlsx</span>
-                  <span className="inbox__import-format-tag">.xls</span>
-                </div>
-              </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    style={{ display: "none" }}
+                    onChange={() => {}}
+                  />
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                style={{ display: "none" }}
-                onChange={() => {
-                  // Handle file selection (future integration)
-                }}
-              />
-
-              <div className="inbox__import-note">
-                <strong>Expected columns:</strong> Name, Email, Phone
-                <br />
-                The system will match imported contacts with your client
-                database and begin surfacing their messages in the inbox.
-              </div>
+                  <div className="inbox__import-note">
+                    <strong>Expected columns:</strong> Name, Email, Phone
+                    <br />
+                    The system will match imported contacts with your client
+                    database and begin surfacing their messages in the inbox.
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
