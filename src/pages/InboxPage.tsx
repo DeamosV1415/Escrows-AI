@@ -1,4 +1,11 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
+import { useAuth } from "../components/AuthContext";
 import "./InboxPage.css";
 
 /* ─── Types ─── */
@@ -35,400 +42,6 @@ interface TrackedContact {
   channels: { gmail: boolean; whatsapp: boolean; sms: boolean };
 }
 
-/* ─── Mock Data ─── */
-
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: "1",
-    contactName: "Sarah Mitchell",
-    contactEmail: "sarah.m@luxeproperties.com",
-    channel: "gmail",
-    lastMessage:
-      "I'd love to schedule a viewing for the downtown penthouse listing",
-    lastTime: "2m ago",
-    unread: 2,
-    priority: true,
-    messages: [
-      {
-        id: "1a",
-        text: "Hi, I saw your listing for the Downtown Skyline Penthouse. Is it still available?",
-        sent: false,
-        time: "10:15 AM",
-      },
-      {
-        id: "1b",
-        text: "Hi Sarah! Yes, the penthouse is still available. Would you like to schedule a viewing?",
-        sent: true,
-        time: "10:22 AM",
-      },
-      {
-        id: "1c",
-        text: "That would be great. I'm particularly interested in the terrace and the building amenities.",
-        sent: false,
-        time: "10:28 AM",
-        subject: "Re: Downtown Skyline Penthouse Viewing",
-      },
-      {
-        id: "1d",
-        text: "I'd love to schedule a viewing for the downtown penthouse listing. Are weekends available?",
-        sent: false,
-        time: "10:30 AM",
-      },
-    ],
-  },
-  {
-    id: "2",
-    contactName: "James Rodriguez",
-    contactPhone: "+1 (555) 234-5678",
-    channel: "whatsapp",
-    lastMessage: "Can we finalize the contract terms this week?",
-    lastTime: "15m ago",
-    unread: 1,
-    priority: true,
-    messages: [
-      {
-        id: "2a",
-        text: "Hey, I reviewed the contract draft you sent over.",
-        sent: false,
-        time: "Yesterday, 4:32 PM",
-      },
-      {
-        id: "2b",
-        text: "Great! Any questions or concerns?",
-        sent: true,
-        time: "Yesterday, 4:45 PM",
-      },
-      {
-        id: "2c",
-        text: "Just a couple of minor things regarding the closing timeline. I'll send my notes.",
-        sent: false,
-        time: "Yesterday, 5:01 PM",
-      },
-      {
-        id: "2d",
-        text: "Can we finalize the contract terms this week?",
-        sent: false,
-        time: "9:48 AM",
-      },
-    ],
-  },
-  {
-    id: "3",
-    contactName: "Emily Chen",
-    contactEmail: "emily.chen@gmail.com",
-    channel: "gmail",
-    lastMessage: "Thanks for the market analysis report. Very thorough!",
-    lastTime: "1h ago",
-    unread: 0,
-    priority: false,
-    messages: [
-      {
-        id: "3a",
-        text: "Hi, could you send me the Q4 market analysis for the Westside neighborhood?",
-        sent: false,
-        time: "Yesterday, 2:10 PM",
-        subject: "Market Analysis Request",
-      },
-      {
-        id: "3b",
-        text: "Of course! I've attached the full report with comparables and trend projections.",
-        sent: true,
-        time: "Yesterday, 3:15 PM",
-        subject: "Re: Market Analysis Request",
-      },
-      {
-        id: "3c",
-        text: "Thanks for the market analysis report. Very thorough!",
-        sent: false,
-        time: "9:02 AM",
-        subject: "Re: Market Analysis Request",
-      },
-    ],
-  },
-  {
-    id: "4",
-    contactName: "Michael Torres",
-    contactPhone: "+1 (555) 876-5432",
-    channel: "sms",
-    lastMessage: "Running 10 min late to the property showing. Sorry!",
-    lastTime: "2h ago",
-    unread: 0,
-    priority: false,
-    messages: [
-      {
-        id: "4a",
-        text: "Hi Michael, just confirming our 2 PM showing at 450 Oak Ave today.",
-        sent: true,
-        time: "12:30 PM",
-      },
-      {
-        id: "4b",
-        text: "Confirmed! See you there.",
-        sent: false,
-        time: "12:45 PM",
-      },
-      {
-        id: "4c",
-        text: "Running 10 min late to the property showing. Sorry!",
-        sent: false,
-        time: "1:50 PM",
-      },
-      {
-        id: "4d",
-        text: "No problem at all, I'll wait for you. Take your time!",
-        sent: true,
-        time: "1:52 PM",
-      },
-    ],
-  },
-  {
-    id: "5",
-    contactName: "Priya Sharma",
-    contactPhone: "+1 (555) 345-6789",
-    channel: "whatsapp",
-    lastMessage:
-      "The 3BR in Maple Ridge is perfect. Let's make an offer.",
-    lastTime: "3h ago",
-    unread: 3,
-    priority: true,
-    messages: [
-      {
-        id: "5a",
-        text: "I've shortlisted 3 properties from your recommendations.",
-        sent: false,
-        time: "Yesterday, 11:00 AM",
-      },
-      {
-        id: "5b",
-        text: "Excellent! Which ones caught your eye?",
-        sent: true,
-        time: "Yesterday, 11:15 AM",
-      },
-      {
-        id: "5c",
-        text: "The Maple Ridge 3BR, the Downtown loft, and the Riverside condo.",
-        sent: false,
-        time: "Yesterday, 11:30 AM",
-      },
-      {
-        id: "5d",
-        text: "All great choices. I can arrange viewings this week.",
-        sent: true,
-        time: "Yesterday, 11:45 AM",
-      },
-      {
-        id: "5e",
-        text: "We visited Maple Ridge yesterday. It's perfect! Can we discuss an offer strategy?",
-        sent: false,
-        time: "8:20 AM",
-      },
-      {
-        id: "5f",
-        text: "The 3BR in Maple Ridge is perfect. Let's make an offer.",
-        sent: false,
-        time: "8:22 AM",
-      },
-    ],
-  },
-  {
-    id: "6",
-    contactName: "David Park",
-    contactEmail: "david.park@realtycorp.com",
-    channel: "gmail",
-    lastMessage:
-      "Inspection report is attached. A few items need attention.",
-    lastTime: "5h ago",
-    unread: 1,
-    priority: false,
-    messages: [
-      {
-        id: "6a",
-        text: "Hi, the home inspection for 1220 Cedar Lane has been completed.",
-        sent: false,
-        time: "7:00 AM",
-        subject: "Inspection Report — 1220 Cedar Lane",
-      },
-      {
-        id: "6b",
-        text: "Inspection report is attached. A few items need attention before we proceed.",
-        sent: false,
-        time: "7:05 AM",
-      },
-    ],
-  },
-  {
-    id: "7",
-    contactName: "Lisa Wang",
-    contactPhone: "+1 (555) 901-2345",
-    channel: "sms",
-    lastMessage:
-      "Can you check if there are any new listings in Oakwood?",
-    lastTime: "Yesterday",
-    unread: 0,
-    priority: false,
-    messages: [
-      {
-        id: "7a",
-        text: "Hi Lisa! I have a couple of new listings you might like. Want me to send details?",
-        sent: true,
-        time: "Mon, 3:00 PM",
-      },
-      {
-        id: "7b",
-        text: "Yes please! Anything in the $500K-$700K range.",
-        sent: false,
-        time: "Mon, 3:30 PM",
-      },
-      {
-        id: "7c",
-        text: "Can you check if there are any new listings in Oakwood?",
-        sent: false,
-        time: "Yesterday, 9:15 AM",
-      },
-    ],
-  },
-  {
-    id: "8",
-    contactName: "Robert Kim",
-    contactPhone: "+1 (555) 567-8901",
-    channel: "whatsapp",
-    lastMessage:
-      "Sent the signed documents via DocuSign. Please confirm.",
-    lastTime: "Yesterday",
-    unread: 0,
-    priority: false,
-    messages: [
-      {
-        id: "8a",
-        text: "The buyer has accepted your counter-offer! Congratulations! 🎉",
-        sent: true,
-        time: "Sun, 2:00 PM",
-      },
-      {
-        id: "8b",
-        text: "That's amazing news! What's the next step?",
-        sent: false,
-        time: "Sun, 2:15 PM",
-      },
-      {
-        id: "8c",
-        text: "I'll send over the purchase agreement for your signature.",
-        sent: true,
-        time: "Sun, 2:20 PM",
-      },
-      {
-        id: "8d",
-        text: "Sent the signed documents via DocuSign. Please confirm.",
-        sent: false,
-        time: "Yesterday, 10:00 AM",
-      },
-    ],
-  },
-];
-
-/* ─── Mock Tracked Contacts ─── */
-
-const MOCK_TRACKED_CONTACTS: TrackedContact[] = [
-  {
-    id: "tc1",
-    name: "Sarah Mitchell",
-    email: "sarah.m@luxeproperties.com",
-    phone: "+1 (555) 123-4567",
-    source: "client",
-    channels: { gmail: true, whatsapp: false, sms: false },
-  },
-  {
-    id: "tc2",
-    name: "James Rodriguez",
-    email: "james.r@outlook.com",
-    phone: "+1 (555) 234-5678",
-    source: "client",
-    channels: { gmail: false, whatsapp: true, sms: false },
-  },
-  {
-    id: "tc3",
-    name: "Emily Chen",
-    email: "emily.chen@gmail.com",
-    phone: "+1 (555) 345-6789",
-    source: "client",
-    channels: { gmail: true, whatsapp: false, sms: false },
-  },
-  {
-    id: "tc4",
-    name: "Michael Torres",
-    email: "m.torres@email.com",
-    phone: "+1 (555) 876-5432",
-    source: "client",
-    channels: { gmail: false, whatsapp: false, sms: true },
-  },
-  {
-    id: "tc5",
-    name: "Priya Sharma",
-    email: "priya.sharma@hotmail.com",
-    phone: "+1 (555) 345-6789",
-    source: "client",
-    channels: { gmail: false, whatsapp: true, sms: false },
-  },
-  {
-    id: "tc6",
-    name: "David Park",
-    email: "david.park@realtycorp.com",
-    phone: "+1 (555) 456-7890",
-    source: "imported",
-    channels: { gmail: true, whatsapp: false, sms: false },
-  },
-  {
-    id: "tc7",
-    name: "Lisa Wang",
-    email: "lisa.wang@gmail.com",
-    phone: "+1 (555) 901-2345",
-    source: "imported",
-    channels: { gmail: false, whatsapp: false, sms: true },
-  },
-  {
-    id: "tc8",
-    name: "Robert Kim",
-    email: "robert.kim@yahoo.com",
-    phone: "+1 (555) 567-8901",
-    source: "client",
-    channels: { gmail: false, whatsapp: true, sms: false },
-  },
-  {
-    id: "tc9",
-    name: "Angela Martinez",
-    email: "angela.m@protonmail.com",
-    phone: "+1 (555) 678-9012",
-    source: "imported",
-    channels: { gmail: true, whatsapp: true, sms: false },
-  },
-  {
-    id: "tc10",
-    name: "Kevin Brooks",
-    email: "kevin.b@gmail.com",
-    phone: "+1 (555) 789-0123",
-    source: "imported",
-    channels: { gmail: true, whatsapp: false, sms: true },
-  },
-  {
-    id: "tc11",
-    name: "Rachel Green",
-    email: "rachel.g@realestate.com",
-    phone: "+1 (555) 890-1234",
-    source: "client",
-    channels: { gmail: true, whatsapp: true, sms: false },
-  },
-  {
-    id: "tc12",
-    name: "Tom Henderson",
-    email: "tom.h@outlook.com",
-    phone: "+1 (555) 012-3456",
-    source: "imported",
-    channels: { gmail: false, whatsapp: false, sms: true },
-  },
-];
-
-/* ─── Channel helpers ─── */
-
 const CHANNEL_LABELS: Record<Channel, string> = {
   gmail: "Gmail",
   whatsapp: "WhatsApp",
@@ -447,7 +60,16 @@ function getInitials(name: string) {
 /* ─── Icon components ─── */
 
 const GmailMiniIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="10"
+    height="10"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
     <polyline points="22,6 12,13 2,6" />
   </svg>
@@ -460,7 +82,16 @@ const WhatsAppMiniIcon = () => (
 );
 
 const SmsMiniIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="10"
+    height="10"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
   </svg>
 );
@@ -476,32 +107,237 @@ const channelMiniIcons: Record<Channel, React.ReactNode> = {
    ═══════════════════════════════════════════════════ */
 
 const InboxPage: React.FC = () => {
+  const { token } = useAuth();
+
   /* ─── State ─── */
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState<Channel | "all">("all");
   const [showUnread, setShowUnread] = useState(false);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
-  const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
   // Contacts panel
   const [showContactsPanel, setShowContactsPanel] = useState(false);
-  const [contactsTab, setContactsTab] = useState<"tracked" | "import">("tracked");
+  const [contactsTab, setContactsTab] = useState<"tracked" | "import">(
+    "tracked",
+  );
   const [contactsSearch, setContactsSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "client" | "imported">("all");
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | "client" | "imported"
+  >("all");
   const [importDragOver, setImportDragOver] = useState(false);
   const [panelWidth, setPanelWidth] = useState(680);
   const isResizing = useRef(false);
 
-  const [connections, setConnections] = useState({
-    gmail: true,
-    whatsapp: true,
-    sms: false,
+  // Real connection status from API
+  const [connections, setConnections] = useState<{
+    gmail: { connected: boolean; email: string | null };
+    whatsapp: { connected: boolean; phone: string | null };
+  }>({
+    gmail: { connected: false, email: null },
+    whatsapp: { connected: false, phone: null },
   });
+  const [connectLoading, setConnectLoading] = useState(false);
+
+  // WhatsApp connect form
+  const [showWaForm, setShowWaForm] = useState(false);
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState("");
+  const [waAccessToken, setWaAccessToken] = useState("");
+  const [waError, setWaError] = useState("");
+
+  // Contacts CRUD state
+  const [trackedContacts, setTrackedContacts] = useState<TrackedContact[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", email: "", phone: "" });
+  const [addError, setAddError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  // Message delete state
+  const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
+  const [deleteConvId, setDeleteConvId] = useState<string | null>(null);
+  const [sendingReply, setSendingReply] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ─── Fetch connection status ─── */
+  const fetchConnectionStatus = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/integrations/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConnections(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch connection status:", err);
+    }
+  }, [token]);
+
+  /* ─── Fetch tracked contacts ─── */
+  const fetchContacts = useCallback(async () => {
+    if (!token) return;
+    setContactsLoading(true);
+    try {
+      const res = await fetch("/api/contacts", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrackedContacts(
+          data.map((c: any) => ({
+            id: c._id,
+            name: c.name,
+            email: c.email,
+            phone: c.phone || "",
+            source: c.source,
+            channels: c.channels || { gmail: false, whatsapp: false, sms: false },
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch contacts:", err);
+    } finally {
+      setContactsLoading(false);
+    }
+  }, [token]);
+
+  /* ─── Fetch conversations from API ─── */
+  const fetchConversations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/messages/conversations", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConversations((prev) => {
+          // Preserve in-memory messages for the currently open chat
+          const prevMap = new Map(prev.map((c) => [c.id, c]));
+          return data.map((c: any) => {
+            const id = c.contactIdentifier || c._id;
+            const existing = prevMap.get(id);
+            const lastTime = c.lastTime
+              ? new Date(c.lastTime).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
+            return {
+              id,
+              contactName: c.contactName || c.contactIdentifier || "Unknown",
+              contactEmail: c.channel === "gmail" ? c.contactIdentifier : undefined,
+              contactPhone: c.channel === "whatsapp" ? c.contactIdentifier : undefined,
+              channel: c.channel as Channel,
+              lastMessage: c.lastMessage || c.lastSubject || "",
+              lastTime,
+              unread: c.unreadCount || 0,
+              priority: false,
+              threadId: c.threadId,
+              lastSubject: c.lastSubject || "",
+              messages: existing?.messages || [],
+            };
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch conversations:", err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchConnectionStatus();
+    fetchContacts();
+    fetchConversations();
+  }, [fetchConnectionStatus, fetchContacts, fetchConversations]);
+
+  /* ─── Poll for new conversations every 30s ─── */
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(fetchConversations, 30000);
+    return () => clearInterval(interval);
+  }, [token, fetchConversations]);
+
+  /* ─── Contacts CRUD ─── */
+  const handleAddContact = async () => {
+    if (!token || !addForm.name.trim() || !addForm.email.trim()) {
+      setAddError("Name and email are required.");
+      return;
+    }
+    setAddError("");
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(addForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchContacts();
+        setAddForm({ name: "", email: "", phone: "" });
+        setShowAddForm(false);
+      } else {
+        setAddError(data.error || "Failed to add contact.");
+      }
+    } catch {
+      setAddError("Network error.");
+    }
+  };
+
+  const handleEditContact = async (id: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/contacts/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(editForm),
+      });
+      if (res.ok) {
+        await fetchContacts();
+        setEditingId(null);
+      }
+    } catch (err) {
+      console.error("Failed to update contact:", err);
+    }
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    if (!token) return;
+    try {
+      await fetch(`/api/contacts/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchContacts();
+      setDeleteConfirmId(null);
+    } catch (err) {
+      console.error("Failed to delete contact:", err);
+    }
+  };
+
+  /* ─── Listen for Gmail OAuth popup message ─── */
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "GMAIL_CONNECTED") {
+        fetchConnectionStatus();
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [fetchConnectionStatus]);
 
   /* ─── Listen for header button events ─── */
   useEffect(() => {
@@ -530,7 +366,7 @@ const InboxPage: React.FC = () => {
         (c) =>
           c.contactName.toLowerCase().includes(q) ||
           c.lastMessage.toLowerCase().includes(q) ||
-          (c.contactEmail && c.contactEmail.toLowerCase().includes(q))
+          (c.contactEmail && c.contactEmail.toLowerCase().includes(q)),
       );
     }
     return list;
@@ -550,7 +386,7 @@ const InboxPage: React.FC = () => {
 
   // Filtered tracked contacts
   const filteredContacts = useMemo(() => {
-    let list = MOCK_TRACKED_CONTACTS;
+    let list = trackedContacts;
     if (sourceFilter !== "all") {
       list = list.filter((c) => c.source === sourceFilter);
     }
@@ -560,87 +396,205 @@ const InboxPage: React.FC = () => {
         (c) =>
           c.name.toLowerCase().includes(q) ||
           c.email.toLowerCase().includes(q) ||
-          c.phone.includes(q)
+          c.phone.includes(q),
       );
     }
     return list;
-  }, [contactsSearch, sourceFilter]);
+  }, [trackedContacts, contactsSearch, sourceFilter]);
 
-  const sourceCounts = useMemo(() => ({
-    all: MOCK_TRACKED_CONTACTS.length,
-    client: MOCK_TRACKED_CONTACTS.filter((c) => c.source === "client").length,
-    imported: MOCK_TRACKED_CONTACTS.filter((c) => c.source === "imported").length,
-  }), []);
+  const sourceCounts = useMemo(
+    () => ({
+      all: trackedContacts.length,
+      client: trackedContacts.filter((c) => c.source === "client").length,
+      imported: trackedContacts.filter((c) => c.source === "imported").length,
+    }),
+    [trackedContacts],
+  );
 
   // Resize handler
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startWidth = panelWidth;
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      const startX = e.clientX;
+      const startWidth = panelWidth;
 
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      const delta = startX - ev.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 400), window.innerWidth * 0.9);
-      setPanelWidth(newWidth);
-    };
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        const delta = startX - ev.clientX;
+        const newWidth = Math.min(
+          Math.max(startWidth + delta, 400),
+          window.innerWidth * 0.9,
+        );
+        setPanelWidth(newWidth);
+      };
 
-    const onMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
+      const onMouseUp = () => {
+        isResizing.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
 
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [panelWidth]);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [panelWidth],
+  );
 
   /* ─── Handlers ─── */
 
-  const openChat = (id: string) => {
+  const openChat = async (id: string) => {
     setActiveChat(id);
     setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c))
+      prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)),
     );
+
+    // Fetch actual messages from API
+    if (!token) return;
+    try {
+      const res = await fetch(
+        `/api/messages/${encodeURIComponent(id)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (res.ok) {
+        const msgs = await res.json();
+        const mapped: Message[] = msgs.map((m: any) => ({
+          id: m._id,
+          text: m.body || "",
+          sent: m.direction === "outbound",
+          time: m.timestamp
+            ? new Date(m.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "",
+          subject: m.subject || undefined,
+        }));
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, messages: mapped } : c)),
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch messages:", err);
+    }
+
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
+    }, 100);
   };
 
-  const handleSend = () => {
-    if (!replyText.trim() || !activeChat) return;
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const newMsg: Message = {
-      id: `msg-${Date.now()}`,
-      text: replyText.trim(),
-      sent: true,
-      time: timeStr,
-    };
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeChat
-          ? {
-              ...c,
-              messages: [...c.messages, newMsg],
-              lastMessage: newMsg.text,
-              lastTime: "Just now",
-            }
-          : c
-      )
-    );
-    setReplyText("");
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
+  const handleSend = async () => {
+    if (!replyText.trim() || !activeChat || !activeConv || !token) return;
+    setSendingReply(true);
+    try {
+      const res = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contactIdentifier: activeChat,
+          body: replyText.trim(),
+          channel: activeConv.channel,
+          subject: (activeConv as any).lastSubject || undefined,
+          threadId: (activeConv as any).threadId || undefined,
+          contactName: activeConv.contactName,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const sentMsg = data.message;
+        const newMsg: Message = {
+          id: sentMsg._id || `msg-${Date.now()}`,
+          text: sentMsg.body || replyText.trim(),
+          sent: true,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          subject: sentMsg.subject || undefined,
+        };
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeChat
+              ? {
+                  ...c,
+                  messages: [...c.messages, newMsg],
+                  lastMessage: newMsg.text,
+                  lastTime: "Just now",
+                }
+              : c,
+          ),
+        );
+        setReplyText("");
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 50);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Send failed:", errData.error);
+        alert(errData.error || "Failed to send message.");
+      }
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      alert("Network error. Please try again.");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  /* ─── Delete message / conversation ─── */
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!token || !activeChat) return;
+    try {
+      const res = await fetch(`/api/messages/${msgId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeChat
+              ? { ...c, messages: c.messages.filter((m) => m.id !== msgId) }
+              : c,
+          ),
+        );
+        setDeleteMsgId(null);
+        // If that was the last message, refresh conversations list
+        const conv = conversations.find((c) => c.id === activeChat);
+        if (conv && conv.messages.length <= 1) {
+          await fetchConversations();
+          setActiveChat(null);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+    }
+  };
+
+  const handleDeleteConversation = async (contactIdentifier: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(
+        `/api/messages/conversation/${encodeURIComponent(contactIdentifier)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (res.ok) {
+        setActiveChat(null);
+        setDeleteConvId(null);
+        await fetchConversations();
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -650,12 +604,109 @@ const InboxPage: React.FC = () => {
     }
   };
 
-  const toggleConnection = (ch: Channel) => {
-    setConnections((prev) => ({ ...prev, [ch]: !prev[ch] }));
+  /* ─── Gmail Connect / Disconnect ─── */
+  const connectGmail = async () => {
+    if (!token) return;
+    setConnectLoading(true);
+    try {
+      const res = await fetch("/api/integrations/gmail/auth-url", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.url) {
+        // Open OAuth popup
+        const popup = window.open(
+          data.url,
+          "Gmail Authorization",
+          "width=600,height=700,left=200,top=100",
+        );
+        // Poll for popup close (fallback if postMessage doesn't fire)
+        const timer = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(timer);
+            fetchConnectionStatus();
+          }
+        }, 1000);
+      }
+    } catch (err) {
+      console.error("Failed to get Gmail auth URL:", err);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const disconnectGmail = async () => {
+    if (!token) return;
+    setConnectLoading(true);
+    try {
+      await fetch("/api/integrations/gmail/disconnect", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchConnectionStatus();
+    } catch (err) {
+      console.error("Failed to disconnect Gmail:", err);
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  /* ─── WhatsApp Connect / Disconnect ─── */
+  const connectWhatsApp = async () => {
+    if (!token || !waPhoneNumberId.trim() || !waAccessToken.trim()) {
+      setWaError("Both fields are required.");
+      return;
+    }
+    setConnectLoading(true);
+    setWaError("");
+    try {
+      const res = await fetch("/api/integrations/whatsapp/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          phoneNumberId: waPhoneNumberId.trim(),
+          accessToken: waAccessToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchConnectionStatus();
+        setShowWaForm(false);
+        setWaPhoneNumberId("");
+        setWaAccessToken("");
+      } else {
+        setWaError(data.error || "Connection failed.");
+      }
+    } catch (err) {
+      console.error("Failed to connect WhatsApp:", err);
+      setWaError("Network error. Please try again.");
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const disconnectWhatsApp = async () => {
+    if (!token) return;
+    setConnectLoading(true);
+    try {
+      await fetch("/api/integrations/whatsapp/disconnect", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchConnectionStatus();
+    } catch (err) {
+      console.error("Failed to disconnect WhatsApp:", err);
+    } finally {
+      setConnectLoading(false);
+    }
   };
 
   /* ─── Render ─── */
   return (
+    <>
     <div className="inbox">
       {/* ── Top Bar ── */}
       <div className="inbox__topbar">
@@ -676,7 +727,16 @@ const InboxPage: React.FC = () => {
           <div className="inbox__list-header">
             {/* Search */}
             <div className="inbox__search">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -714,7 +774,7 @@ const InboxPage: React.FC = () => {
                 className={`inbox__filter-pill inbox__filter-pill--whatsapp ${channelFilter === "whatsapp" ? "inbox__filter-pill--active" : ""}`}
                 onClick={() =>
                   setChannelFilter(
-                    channelFilter === "whatsapp" ? "all" : "whatsapp"
+                    channelFilter === "whatsapp" ? "all" : "whatsapp",
                   )
                 }
               >
@@ -743,7 +803,10 @@ const InboxPage: React.FC = () => {
           {/* Chat Items */}
           <div className="inbox__chats">
             {filtered.length === 0 ? (
-              <div className="inbox__empty" style={{ background: "transparent", padding: "40px 16px" }}>
+              <div
+                className="inbox__empty"
+                style={{ background: "transparent", padding: "40px 16px" }}
+              >
                 <p style={{ fontSize: "0.82rem" }}>No conversations found</p>
               </div>
             ) : (
@@ -753,21 +816,31 @@ const InboxPage: React.FC = () => {
                   className={`inbox__chat-item ${activeChat === conv.id ? "inbox__chat-item--active" : ""} ${conv.unread > 0 ? "inbox__chat-item--unread" : ""}`}
                   onClick={() => openChat(conv.id)}
                 >
-                  <div className={`inbox__chat-avatar inbox__chat-avatar--${conv.channel}`}>
+                  <div
+                    className={`inbox__chat-avatar inbox__chat-avatar--${conv.channel}`}
+                  >
                     {getInitials(conv.contactName)}
-                    <div className={`inbox__avatar-channel inbox__avatar-channel--${conv.channel}`}>
+                    <div
+                      className={`inbox__avatar-channel inbox__avatar-channel--${conv.channel}`}
+                    >
                       {channelMiniIcons[conv.channel]}
                     </div>
                   </div>
                   <div className="inbox__chat-info">
                     <div className="inbox__chat-top">
-                      <span className="inbox__chat-name">{conv.contactName}</span>
+                      <span className="inbox__chat-name">
+                        {conv.contactName}
+                      </span>
                       <span className="inbox__chat-time">{conv.lastTime}</span>
                     </div>
                     <div className="inbox__chat-bottom">
-                      <span className="inbox__chat-preview">{conv.lastMessage}</span>
+                      <span className="inbox__chat-preview">
+                        {conv.lastMessage}
+                      </span>
                       {conv.unread > 0 && (
-                        <span className="inbox__chat-unread-badge">{conv.unread}</span>
+                        <span className="inbox__chat-unread-badge">
+                          {conv.unread}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -782,18 +855,34 @@ const InboxPage: React.FC = () => {
           <div className="inbox__conversation">
             <div className="inbox__conv-header">
               <div className="inbox__conv-header-left">
-                <button className="inbox__mobile-back" onClick={() => setActiveChat(null)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <button
+                  className="inbox__mobile-back"
+                  onClick={() => setActiveChat(null)}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                 </button>
-                <div className={`inbox__conv-avatar inbox__conv-avatar--${activeConv.channel}`}>
+                <div
+                  className={`inbox__conv-avatar inbox__conv-avatar--${activeConv.channel}`}
+                >
                   {getInitials(activeConv.contactName)}
                 </div>
                 <div className="inbox__conv-info">
                   <h3>{activeConv.contactName}</h3>
                   <div className="inbox__conv-meta">
-                    <span className={`inbox__channel-badge inbox__channel-badge--${activeConv.channel}`}>
+                    <span
+                      className={`inbox__channel-badge inbox__channel-badge--${activeConv.channel}`}
+                    >
                       {CHANNEL_LABELS[activeConv.channel]}
                     </span>
                     <span className="inbox__conv-email">
@@ -804,34 +893,86 @@ const InboxPage: React.FC = () => {
               </div>
               <div className="inbox__conv-actions">
                 <button className="inbox__conv-action-btn" title="Star">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 </button>
                 <button className="inbox__conv-action-btn" title="Archive">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <polyline points="21 8 21 21 3 21 3 8" />
                     <rect x="1" y="3" width="22" height="5" />
                     <line x1="10" y1="12" x2="14" y2="12" />
                   </svg>
                 </button>
-                <button className="inbox__conv-action-btn" title="More">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="19" cy="12" r="1" />
-                    <circle cx="5" cy="12" r="1" />
+                <button
+                  className="inbox__conv-action-btn inbox__conv-action-btn--delete"
+                  title="Delete Conversation"
+                  onClick={() => setDeleteConvId(activeConv.id)}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
                   </svg>
                 </button>
               </div>
             </div>
 
             <div className="inbox__messages">
-              <div className="inbox__date-sep"><span>Today</span></div>
+              <div className="inbox__date-sep">
+                <span>Today</span>
+              </div>
               {activeConv.messages.map((msg) => (
-                <div key={msg.id} className={`inbox__msg inbox__msg--${msg.sent ? "sent" : "received"}`}>
+                <div
+                  key={msg.id}
+                  className={`inbox__msg inbox__msg--${msg.sent ? "sent" : "received"}`}
+                >
                   <div className="inbox__msg-bubble">
-                    {msg.subject && <span className="inbox__msg-subject">{msg.subject}</span>}
+                    {msg.subject && (
+                      <span className="inbox__msg-subject">{msg.subject}</span>
+                    )}
                     {msg.text}
+                    <button
+                      className="inbox__msg-delete-btn"
+                      title="Delete message"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteMsgId(msg.id);
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                      </svg>
+                    </button>
                   </div>
                   <span className="inbox__msg-time">{msg.time}</span>
                 </div>
@@ -841,10 +982,14 @@ const InboxPage: React.FC = () => {
 
             <div className="inbox__composer">
               <div className="inbox__composer-channel">
-                <span className={`inbox__composer-channel-dot inbox__composer-channel-dot--${activeConv.channel}`} />
+                <span
+                  className={`inbox__composer-channel-dot inbox__composer-channel-dot--${activeConv.channel}`}
+                />
                 Replying via {CHANNEL_LABELS[activeConv.channel]}
                 {activeConv.contactEmail && ` · ${activeConv.contactEmail}`}
-                {activeConv.contactPhone && !activeConv.contactEmail && ` · ${activeConv.contactPhone}`}
+                {activeConv.contactPhone &&
+                  !activeConv.contactEmail &&
+                  ` · ${activeConv.contactPhone}`}
               </div>
               <div className="inbox__composer-row">
                 <textarea
@@ -855,8 +1000,22 @@ const InboxPage: React.FC = () => {
                   onKeyDown={handleKeyDown}
                   rows={1}
                 />
-                <button className="inbox__send-btn" onClick={handleSend} title="Send">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <button
+                  className="inbox__send-btn"
+                  onClick={handleSend}
+                  title="Send"
+                  disabled={sendingReply}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <line x1="22" y1="2" x2="11" y2="13" />
                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
@@ -867,79 +1026,216 @@ const InboxPage: React.FC = () => {
         ) : (
           <div className="inbox__empty">
             <div className="inbox__empty-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
             </div>
             <h3>Select a Conversation</h3>
-            <p>Choose a conversation from the list to view messages and reply through the same channel.</p>
+            <p>
+              Choose a conversation from the list to view messages and reply
+              through the same channel.
+            </p>
           </div>
         )}
       </div>
 
       {/* ═══ Connect Apps Modal ═══ */}
       {showConnectModal && (
-        <div className="inbox__modal-overlay" onClick={() => setShowConnectModal(false)}>
+        <div
+          className="inbox__modal-overlay"
+          onClick={() => setShowConnectModal(false)}
+        >
           <div className="inbox__modal" onClick={(e) => e.stopPropagation()}>
             <div className="inbox__modal-header">
               <h2>Connect Apps</h2>
-              <button className="inbox__modal-close" onClick={() => setShowConnectModal(false)}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <button
+                className="inbox__modal-close"
+                onClick={() => setShowConnectModal(false)}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
             <div className="inbox__modal-body">
-              {/* Gmail */}
+              {/* Gmail — Real OAuth */}
               <div className="inbox__connection">
                 <div className="inbox__connection-icon inbox__connection-icon--gmail">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                     <polyline points="22,6 12,13 2,6" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">Gmail</span>
-                  <span className="inbox__connection-desc">Connect your Google account to send and receive emails</span>
+                  {connections.gmail.connected ? (
+                    <span className="inbox__connection-desc inbox__connection-desc--connected">
+                      ✅ Connected as <strong>{connections.gmail.email}</strong>
+                    </span>
+                  ) : (
+                    <span className="inbox__connection-desc">
+                      Connect your Google account to send and receive emails
+                    </span>
+                  )}
                 </div>
-                <label className="inbox__toggle">
-                  <input type="checkbox" checked={connections.gmail} onChange={() => toggleConnection("gmail")} />
-                  <span className="inbox__toggle-slider" />
-                </label>
+                {connections.gmail.connected ? (
+                  <button
+                    className="inbox__disconnect-btn"
+                    onClick={disconnectGmail}
+                    disabled={connectLoading}
+                  >
+                    {connectLoading ? "…" : "Disconnect"}
+                  </button>
+                ) : (
+                  <button
+                    className="inbox__connect-btn"
+                    onClick={connectGmail}
+                    disabled={connectLoading}
+                  >
+                    {connectLoading ? "Connecting…" : "Connect"}
+                  </button>
+                )}
               </div>
-              {/* WhatsApp */}
+              {/* WhatsApp — Form-based connect */}
               <div className="inbox__connection">
                 <div className="inbox__connection-icon inbox__connection-icon--whatsapp">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">WhatsApp</span>
-                  <span className="inbox__connection-desc">Connect WhatsApp Business to message your clients</span>
+                  {connections.whatsapp.connected ? (
+                    <span className="inbox__connection-desc inbox__connection-desc--connected">
+                      ✅ Connected as{" "}
+                      <strong>{connections.whatsapp.phone}</strong>
+                    </span>
+                  ) : (
+                    <span className="inbox__connection-desc">
+                      Connect WhatsApp Business to message your clients
+                    </span>
+                  )}
                 </div>
-                <label className="inbox__toggle">
-                  <input type="checkbox" checked={connections.whatsapp} onChange={() => toggleConnection("whatsapp")} />
-                  <span className="inbox__toggle-slider" />
-                </label>
+                {connections.whatsapp.connected ? (
+                  <button
+                    className="inbox__disconnect-btn"
+                    onClick={disconnectWhatsApp}
+                    disabled={connectLoading}
+                  >
+                    {connectLoading ? "…" : "Disconnect"}
+                  </button>
+                ) : (
+                  <button
+                    className="inbox__connect-btn"
+                    onClick={() => {
+                      setShowWaForm(!showWaForm);
+                      setWaError("");
+                    }}
+                    disabled={connectLoading}
+                  >
+                    {showWaForm ? "Cancel" : "Connect"}
+                  </button>
+                )}
               </div>
-              {/* SMS */}
-              <div className="inbox__connection">
+              {/* WhatsApp connect form (inline) */}
+              {showWaForm && !connections.whatsapp.connected && (
+                <div className="inbox__wa-form">
+                  <input
+                    className="inbox__wa-input"
+                    type="text"
+                    placeholder="Phone Number ID"
+                    value={waPhoneNumberId}
+                    onChange={(e) => setWaPhoneNumberId(e.target.value)}
+                  />
+                  <input
+                    className="inbox__wa-input"
+                    type="password"
+                    placeholder="Access Token"
+                    value={waAccessToken}
+                    onChange={(e) => setWaAccessToken(e.target.value)}
+                  />
+                  {waError && <p className="inbox__wa-error">{waError}</p>}
+                  <button
+                    className="inbox__connect-btn inbox__wa-submit"
+                    onClick={connectWhatsApp}
+                    disabled={connectLoading}
+                  >
+                    {connectLoading ? "Verifying…" : "Verify & Connect"}
+                  </button>
+                  <p className="inbox__wa-hint">
+                    Get these from your{" "}
+                    <a
+                      href="https://developers.facebook.com/apps"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Meta Developer Console
+                    </a>{" "}
+                    → WhatsApp → API Setup
+                  </p>
+                </div>
+              )}
+              {/* SMS — Coming Soon */}
+              <div className="inbox__connection inbox__connection--disabled">
                 <div className="inbox__connection-icon inbox__connection-icon--sms">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
                   <span className="inbox__connection-name">SMS</span>
-                  <span className="inbox__connection-desc">Send and receive text messages via Twilio integration</span>
+                  <span className="inbox__connection-desc">
+                    Send and receive text messages via Twilio integration
+                  </span>
                 </div>
-                <label className="inbox__toggle">
-                  <input type="checkbox" checked={connections.sms} onChange={() => toggleConnection("sms")} />
-                  <span className="inbox__toggle-slider" />
-                </label>
+                <span className="inbox__coming-soon-badge">Coming Soon</span>
               </div>
             </div>
           </div>
@@ -966,7 +1262,16 @@ const InboxPage: React.FC = () => {
                 className="inbox__contacts-close"
                 onClick={() => setShowContactsPanel(false)}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -981,7 +1286,7 @@ const InboxPage: React.FC = () => {
               >
                 Tracked
                 <span className="inbox__contacts-tab-count">
-                  {MOCK_TRACKED_CONTACTS.length}
+                  {trackedContacts.length}
                 </span>
               </button>
               <button
@@ -999,7 +1304,16 @@ const InboxPage: React.FC = () => {
                   {/* Search + Count */}
                   <div className="inbox__contacts-toolbar">
                     <div className="inbox__contacts-search">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <circle cx="11" cy="11" r="8" />
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
@@ -1011,9 +1325,48 @@ const InboxPage: React.FC = () => {
                       />
                     </div>
                     <span className="inbox__contacts-count-label">
-                      {filteredContacts.length} contact{filteredContacts.length !== 1 ? "s" : ""}
+                      {filteredContacts.length} contact
+                      {filteredContacts.length !== 1 ? "s" : ""}
                     </span>
+                    <button
+                      className="inbox__contacts-add-btn"
+                      onClick={() => { setShowAddForm(!showAddForm); setAddError(""); }}
+                      title="Add contact"
+                    >
+                      {showAddForm ? "✕" : "+"}
+                    </button>
                   </div>
+
+                  {/* Add Contact Form */}
+                  {showAddForm && (
+                    <div className="inbox__contacts-add-form">
+                      <input
+                        type="text"
+                        placeholder="Name *"
+                        value={addForm.name}
+                        onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                        className="inbox__wa-input"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email *"
+                        value={addForm.email}
+                        onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                        className="inbox__wa-input"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Phone (optional)"
+                        value={addForm.phone}
+                        onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                        className="inbox__wa-input"
+                      />
+                      {addError && <p className="inbox__wa-error">{addError}</p>}
+                      <button className="inbox__connect-btn" onClick={handleAddContact} style={{ width: "100%", padding: "8px" }}>
+                        Add Contact
+                      </button>
+                    </div>
+                  )}
 
                   {/* Source Filter Pills */}
                   <div className="inbox__contacts-filters">
@@ -1040,7 +1393,16 @@ const InboxPage: React.FC = () => {
                   {/* Contacts Table */}
                   {filteredContacts.length === 0 ? (
                     <div className="inbox__contacts-empty">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
                         <circle cx="9" cy="7" r="4" />
                       </svg>
@@ -1055,6 +1417,7 @@ const InboxPage: React.FC = () => {
                           <th>Phone</th>
                           <th>Source</th>
                           <th>Channels</th>
+                          <th style={{ width: "70px" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1070,17 +1433,29 @@ const InboxPage: React.FC = () => {
                                 </span>
                               </div>
                             </td>
-                            <td style={{ color: "var(--text-secondary)", fontSize: "0.82rem" }}>
+                            <td
+                              style={{
+                                color: "var(--text-secondary)",
+                                fontSize: "0.82rem",
+                              }}
+                            >
                               {contact.email}
                             </td>
-                            <td style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                            <td
+                              style={{
+                                color: "var(--text-muted)",
+                                fontSize: "0.82rem",
+                              }}
+                            >
                               {contact.phone}
                             </td>
                             <td>
                               <span
                                 className={`inbox__source-badge inbox__source-badge--${contact.source}`}
                               >
-                                {contact.source === "client" ? "Client" : "Imported"}
+                                {contact.source === "client"
+                                  ? "Client"
+                                  : "Imported"}
                               </span>
                             </td>
                             <td>
@@ -1103,6 +1478,33 @@ const InboxPage: React.FC = () => {
                                 >
                                   <SmsMiniIcon />
                                 </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="inbox__contact-actions">
+                                <button
+                                  className="inbox__contact-action-icon"
+                                  title="Edit"
+                                  onClick={() => {
+                                    setEditingId(contact.id);
+                                    setEditForm({ name: contact.name, email: contact.email, phone: contact.phone });
+                                  }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  className="inbox__contact-action-icon inbox__contact-action-icon--delete"
+                                  title="Delete"
+                                  onClick={() => setDeleteConfirmId(contact.id)}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                  </svg>
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1128,7 +1530,16 @@ const InboxPage: React.FC = () => {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <div className="inbox__import-zone-icon">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
@@ -1166,7 +1577,122 @@ const InboxPage: React.FC = () => {
         </>
       )}
     </div>
+
+      {/* ═══ Delete Confirmation Modal ═══ */}
+      {deleteConfirmId && (
+        <div className="inbox__modal-overlay" onClick={() => setDeleteConfirmId(null)}>
+          <div className="inbox__modal inbox__modal--sm" onClick={(e) => e.stopPropagation()}>
+            <div className="inbox__modal-header">
+              <h2>Delete Contact</h2>
+              <button className="inbox__modal-close" onClick={() => setDeleteConfirmId(null)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="inbox__modal-body" style={{ textAlign: "center", padding: "24px" }}>
+              <p style={{ marginBottom: "20px", color: "var(--text-secondary)" }}>
+                Are you sure you want to delete this contact? This action cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <button className="inbox__connect-btn" style={{ background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }} onClick={() => setDeleteConfirmId(null)}>
+                  Cancel
+                </button>
+                <button className="inbox__connect-btn" style={{ background: "#dc3545", borderColor: "#dc3545" }} onClick={() => handleDeleteContact(deleteConfirmId!)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Edit Contact Modal ═══ */}
+      {editingId && (
+        <div className="inbox__modal-overlay" onClick={() => setEditingId(null)}>
+          <div className="inbox__modal inbox__modal--sm" onClick={(e) => e.stopPropagation()}>
+            <div className="inbox__modal-header">
+              <h2>Edit Contact</h2>
+              <button className="inbox__modal-close" onClick={() => setEditingId(null)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="inbox__modal-body" style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px" }}>
+              <input className="inbox__wa-input" type="text" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+              <input className="inbox__wa-input" type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+              <input className="inbox__wa-input" type="text" placeholder="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+              <button className="inbox__connect-btn" style={{ width: "100%", padding: "10px", marginTop: "4px" }} onClick={() => handleEditContact(editingId!)}>
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Delete Message Confirmation Modal ═══ */}
+      {deleteMsgId && (
+        <div className="inbox__modal-overlay" onClick={() => setDeleteMsgId(null)}>
+          <div className="inbox__modal inbox__modal--sm" onClick={(e) => e.stopPropagation()}>
+            <div className="inbox__modal-header">
+              <h2>Delete Message</h2>
+              <button className="inbox__modal-close" onClick={() => setDeleteMsgId(null)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="inbox__modal-body" style={{ padding: "16px 20px" }}>
+              <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                Are you sure you want to delete this message? This action cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button className="inbox__connect-btn" style={{ background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }} onClick={() => setDeleteMsgId(null)}>
+                  Cancel
+                </button>
+                <button className="inbox__connect-btn" style={{ background: "#dc3545", borderColor: "#dc3545" }} onClick={() => handleDeleteMessage(deleteMsgId)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Delete Conversation Confirmation Modal ═══ */}
+      {deleteConvId && (
+        <div className="inbox__modal-overlay" onClick={() => setDeleteConvId(null)}>
+          <div className="inbox__modal inbox__modal--sm" onClick={(e) => e.stopPropagation()}>
+            <div className="inbox__modal-header">
+              <h2>Delete Conversation</h2>
+              <button className="inbox__modal-close" onClick={() => setDeleteConvId(null)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="inbox__modal-body" style={{ padding: "16px 20px" }}>
+              <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                Are you sure you want to delete this entire conversation and all its messages? This action cannot be undone.
+              </p>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button className="inbox__connect-btn" style={{ background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }} onClick={() => setDeleteConvId(null)}>
+                  Cancel
+                </button>
+                <button className="inbox__connect-btn" style={{ background: "#dc3545", borderColor: "#dc3545" }} onClick={() => handleDeleteConversation(deleteConvId)}>
+                  Delete All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
-
 export default InboxPage;

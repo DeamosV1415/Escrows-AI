@@ -643,6 +643,54 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+/* Message delete button (on hover) */
+
+.inbox__msg-delete-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  padding: 0;
+}
+
+.inbox__msg-bubble:hover .inbox__msg-delete-btn {
+  opacity: 1;
+}
+
+.inbox__msg-delete-btn:hover {
+  background: #fce8e6;
+  color: #dc3545;
+}
+
+.inbox__msg--sent .inbox__msg-delete-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.inbox__msg--sent .inbox__msg-delete-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* Delete conversation button in header */
+
+.inbox__conv-action-btn--delete:hover {
+  color: #dc3545 !important;
+  border-color: #fce8e6 !important;
+  background: #fce8e6 !important;
+}
+
 /* Typing indicator */
 
 .inbox__typing {
@@ -970,49 +1018,216 @@
   color: var(--text-muted);
 }
 
-/* Toggle switch */
+/* Connect / Disconnect buttons */
 
-.inbox__toggle {
-  position: relative;
-  width: 44px;
-  height: 24px;
+.inbox__connect-btn,
+.inbox__disconnect-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.inbox__connect-btn {
+  background: linear-gradient(135deg, var(--olive-700), var(--olive-800));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(74, 93, 35, 0.2);
+}
+
+.inbox__connect-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--olive-600), var(--olive-700));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 93, 35, 0.3);
+}
+
+.inbox__connect-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inbox__disconnect-btn {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+}
+
+.inbox__disconnect-btn:hover:not(:disabled) {
+  background: #fce8e6;
+  color: #c5221f;
+  border-color: #f5c6cb;
+}
+
+.inbox__disconnect-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Connected status */
+
+.inbox__connection-desc--connected {
+  color: var(--olive-700);
+  font-weight: 500;
+}
+
+.inbox__connection-desc--connected strong {
+  color: var(--text-primary);
+}
+
+/* Disabled connection (Coming Soon) */
+
+.inbox__connection--disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Coming Soon badge */
+
+.inbox__coming-soon-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
-.inbox__toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+/* WhatsApp inline connect form */
+
+.inbox__wa-form {
+  padding: 14px 16px;
+  margin: -4px 0 10px;
+  border: 1px solid var(--border-light);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.inbox__toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background: var(--border-medium);
-  border-radius: 24px;
-  transition: all 0.3s ease;
+.inbox__wa-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
 }
 
-.inbox__toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background: #fff;
+.inbox__wa-input:focus {
+  border-color: var(--olive-300);
+  box-shadow: 0 0 0 3px rgba(106, 128, 53, 0.08);
+}
+
+.inbox__wa-input::placeholder {
+  color: var(--text-muted);
+}
+
+.inbox__wa-error {
+  font-size: 0.75rem;
+  color: #dc3545;
+  margin: 0;
+}
+
+.inbox__wa-submit {
+  width: 100%;
+  padding: 10px;
+}
+
+.inbox__wa-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+}
+
+.inbox__wa-hint a {
+  color: var(--olive-600);
+  text-decoration: underline;
+}
+
+/* Contacts CRUD */
+
+.inbox__contacts-add-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  border: 1.5px solid var(--olive-300);
+  background: transparent;
+  color: var(--olive-600);
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.inbox__toggle input:checked + .inbox__toggle-slider {
-  background: var(--olive-600);
+.inbox__contacts-add-btn:hover {
+  background: var(--olive-100);
+  border-color: var(--olive-500);
 }
 
-.inbox__toggle input:checked + .inbox__toggle-slider::before {
-  transform: translateX(20px);
+.inbox__contacts-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  margin-bottom: 10px;
+}
+
+.inbox__contact-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inbox__contact-action-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.inbox__contact-action-icon:hover {
+  background: var(--olive-100);
+  color: var(--olive-700);
+}
+
+.inbox__contact-action-icon--delete:hover {
+  background: rgba(220, 53, 69, 0.08);
+  color: #dc3545;
+}
+
+.inbox__modal--sm {
+  max-width: 400px;
 }
 
 /* ─── Import Contacts Modal ─── */

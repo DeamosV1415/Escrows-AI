@@ -104,13 +104,37 @@
   background: rgba(85, 107, 47, 0.08);
 }
 
-/* ─── CTA Button (right, outside navbar) ─── */
+/* ─── CTA Buttons (right, outside navbar) ─── */
+
+.header__cta-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
 
 .header__cta {
   padding: 10px 24px;
   font-size: 0.85rem;
   border-radius: 8px;
   flex-shrink: 0;
+  text-decoration: none;
+  text-align: center;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--olive-700);
+  border: 1.5px solid var(--olive-300);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-weight: 500;
+}
+
+.btn-outline:hover {
+  background: var(--olive-100);
+  border-color: var(--olive-500);
+  color: var(--olive-800);
 }
 
 /* ─── Mobile ─── */
@@ -203,7 +227,7 @@
     display: none;
   }
 
-  .header__cta {
+  .header__cta-group {
     display: none;
   }
 

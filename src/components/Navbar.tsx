@@ -55,10 +55,13 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
         </div>
       </nav>
 
-      {/* CTA — outside navbar */}
-      <button className="btn btn-primary header__cta" onClick={onJoinWaitlist}>
-        Join Waitlist
-      </button>
+      {/* CTAs — outside navbar */}
+      <div className="header__cta-group">
+        <a href="/login" className="btn btn-outline header__cta">Sign Up</a>
+        <button className="btn btn-primary header__cta" onClick={onJoinWaitlist}>
+          Join Waitlist
+        </button>
+      </div>
 
       {/* Mobile hamburger */}
       <button
@@ -84,6 +87,13 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
               {link.label}
             </a>
           ))}
+          <a
+            href="/login"
+            className="btn btn-outline header__mobile-cta"
+            onClick={() => setMobileOpen(false)}
+          >
+            Sign Up
+          </a>
           <button
             className="btn btn-primary header__mobile-cta"
             onClick={() => {
