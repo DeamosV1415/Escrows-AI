@@ -19,6 +19,7 @@ import createIntegrationsRouter from "./routes/integrations.js";
 import createWebhooksRouter from "./routes/webhooks.js";
 import createMessagesRouter from "./routes/messages.js";
 import createContactsRouter from "./routes/contacts.js";
+import createDashboardRouter from "./routes/dashboard.js";
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -199,7 +200,7 @@ async function start() {
     const TrackedContact = clientsConn.model("TrackedContact", trackedContactSchema, "TrackedContacts");
 
     app.use("/api/auth", createAuthRouter(User));
-    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem));
+    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact));
     app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem));
     // Gmail OAuth callback needs to skip auth — Google redirects the browser there (no JWT)
     const integrationsAuthMiddleware = (req, res, next) => {
@@ -210,6 +211,7 @@ async function start() {
     app.use("/api/webhooks", createWebhooksRouter(Connection, Message, TrackedContact, Client)); // No auth — called by Google
     app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message));
     app.use("/api/contacts", authMiddleware, createContactsRouter(TrackedContact, Client));
+    app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User));
   } catch (err) {
     console.error("❌ Clients DB connection failed:", err.message);
     process.exit(1);

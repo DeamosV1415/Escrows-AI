@@ -16,6 +16,7 @@ interface Client {
   budget: number;
   requirements: string;
   nextAction: string;
+  nextActionPriority: "high" | "medium" | "low";
   notes: string;
   createdAt: string;
   updatedAt: string;

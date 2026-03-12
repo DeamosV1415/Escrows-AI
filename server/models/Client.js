@@ -20,6 +20,11 @@ const clientSchema = new mongoose.Schema(
     budget: { type: Number, default: 0 },
     requirements: { type: String, default: "" },
     nextAction: { type: String, default: "" },
+    nextActionPriority: {
+      type: String,
+      enum: ["high", "medium", "low"],
+      default: "medium",
+    },
     notes: { type: String, default: "" },
   },
   { timestamps: true },

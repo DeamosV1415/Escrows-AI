@@ -12,6 +12,7 @@ interface ClientData {
   budget: number;
   requirements: string;
   nextAction: string;
+  nextActionPriority: "high" | "medium" | "low";
   notes: string;
 }
 
@@ -38,6 +39,7 @@ const defaultForm: ClientData = {
   budget: 0,
   requirements: "",
   nextAction: "",
+  nextActionPriority: "medium",
   notes: "",
 };
 
@@ -65,9 +67,21 @@ const ClientModal: React.FC<ClientModalProps> = ({
     >,
   ) => {
     const { name, value } = e.target;
+    if (name === "phone") {
+      // Only allow digits, +, -, (, ), and spaces
+      const cleaned = value.replace(/[^\d+\-()\s]/g, "");
+      setForm((prev) => ({ ...prev, phone: cleaned }));
+      return;
+    }
+    if (name === "budget") {
+      // Only allow digits
+      const num = Number(value.replace(/[^\d]/g, "")) || 0;
+      setForm((prev) => ({ ...prev, budget: num }));
+      return;
+    }
     setForm((prev) => ({
       ...prev,
-      [name]: name === "budget" ? Number(value) || 0 : value,
+      [name]: value,
     }));
   };
 
@@ -75,8 +89,35 @@ const ClientModal: React.FC<ClientModalProps> = ({
     e.preventDefault();
     setError("");
 
-    if (!form.name.trim() || !form.email.trim()) {
-      setError("Name and Email are required.");
+    // All fields required
+    if (!form.name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    if (!form.email.trim()) {
+      setError("Email is required.");
+      return;
+    }
+    if (!form.company.trim()) {
+      setError("Company is required.");
+      return;
+    }
+    if (!form.phone.trim()) {
+      setError("Phone is required.");
+      return;
+    }
+
+    // Email validation — must have valid format with real TLD
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(form.email.trim())) {
+      setError("Please enter a valid email address (e.g. name@company.com).");
+      return;
+    }
+
+    // Phone: must have at least 7 digits
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (phoneDigits.length < 7) {
+      setError("Phone number must have at least 7 digits.");
       return;
     }
 
@@ -130,10 +171,13 @@ const ClientModal: React.FC<ClientModalProps> = ({
                 placeholder="John Doe"
                 className="client-modal__input"
                 autoFocus
+                required
               />
             </div>
             <div className="client-modal__field">
-              <label className="client-modal__label">Company</label>
+              <label className="client-modal__label">
+                Company <span className="client-modal__required">*</span>
+              </label>
               <input
                 type="text"
                 name="company"
@@ -141,6 +185,7 @@ const ClientModal: React.FC<ClientModalProps> = ({
                 onChange={handleChange}
                 placeholder="Acme Corp"
                 className="client-modal__input"
+                required
               />
             </div>
           </div>
@@ -157,17 +202,21 @@ const ClientModal: React.FC<ClientModalProps> = ({
                 onChange={handleChange}
                 placeholder="john@example.com"
                 className="client-modal__input"
+                required
               />
             </div>
             <div className="client-modal__field">
-              <label className="client-modal__label">Phone</label>
+              <label className="client-modal__label">
+                Phone <span className="client-modal__required">*</span>
+              </label>
               <input
-                type="text"
+                type="tel"
                 name="phone"
                 value={form.phone}
                 onChange={handleChange}
                 placeholder="(555) 123-4567"
                 className="client-modal__input"
+                required
               />
             </div>
           </div>
@@ -234,16 +283,31 @@ const ClientModal: React.FC<ClientModalProps> = ({
             />
           </div>
 
-          <div className="client-modal__field">
-            <label className="client-modal__label">Next Action</label>
-            <input
-              type="text"
-              name="nextAction"
-              value={form.nextAction}
-              onChange={handleChange}
-              placeholder="Follow up on property tour"
-              className="client-modal__input"
-            />
+          <div className="client-modal__row">
+            <div className="client-modal__field" style={{ flex: 1 }}>
+              <label className="client-modal__label">Next Action</label>
+              <input
+                type="text"
+                name="nextAction"
+                value={form.nextAction}
+                onChange={handleChange}
+                placeholder="Follow up on property tour"
+                className="client-modal__input"
+              />
+            </div>
+            <div className="client-modal__field" style={{ width: 140, flexShrink: 0 }}>
+              <label className="client-modal__label">Priority</label>
+              <select
+                name="nextActionPriority"
+                value={form.nextActionPriority}
+                onChange={handleChange}
+                className="client-modal__input client-modal__select"
+              >
+                <option value="high">🔴 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
+              </select>
+            </div>
           </div>
 
           {error && <div className="client-modal__error">{error}</div>}

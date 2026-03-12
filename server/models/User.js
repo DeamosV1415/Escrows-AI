@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
     specialization: { type: String, trim: true, default: "" }, // e.g. Residential, Commercial, Land
     teamSize: { type: String, trim: true, default: "" }, // Solo, 2-5, 6-20, 20+
   },
-  { timestamps: true },
+  { timestamps: true, autoIndex: false },
 );
 
 export default userSchema;

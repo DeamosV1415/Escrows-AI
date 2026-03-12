@@ -1,6 +1,6 @@
 import express from "express";
 
-export default function createClientsRouter(Client, InventoryItem) {
+export default function createClientsRouter(Client, InventoryItem, TrackedContact) {
   const router = express.Router();
 
   // ─── GET /api/clients ───
@@ -57,6 +57,7 @@ export default function createClientsRouter(Client, InventoryItem) {
         budget,
         requirements,
         nextAction,
+        nextActionPriority,
         notes,
       } = req.body;
 
@@ -75,11 +76,43 @@ export default function createClientsRouter(Client, InventoryItem) {
         budget: budget || 0,
         requirements,
         nextAction,
+        nextActionPriority,
         notes,
       });
 
       await client.save();
       console.log(`✅ Client created: ${name} <${email}>`);
+
+      // ─── Auto-create TrackedContact for inbox ───
+      if (TrackedContact && email) {
+        try {
+          const existing = await TrackedContact.findOne({
+            userId: req.userId,
+            email: email.toLowerCase(),
+          });
+          if (!existing) {
+            const tracked = new TrackedContact({
+              userId: req.userId,
+              name,
+              email: email.toLowerCase(),
+              phone: phone || "",
+              source: "client",
+              clientRef: client._id,
+              channels: {
+                gmail: !!email,
+                whatsapp: !!phone,
+                sms: !!phone,
+              },
+            });
+            await tracked.save();
+            console.log(`📇 Auto-created tracked contact: ${name} <${email}>`);
+          }
+        } catch (tcErr) {
+          if (tcErr.code !== 11000) {
+            console.error("⚠️ Failed to auto-create tracked contact:", tcErr.message);
+          }
+        }
+      }
 
       // ─── Auto-create inventory folder for this client ───
       if (InventoryItem) {
@@ -185,6 +218,19 @@ export default function createClientsRouter(Client, InventoryItem) {
             "⚠️ Failed to cascade delete inventory:",
             invErr.message,
           );
+        }
+      }
+
+      // ─── Remove linked TrackedContact ───
+      if (TrackedContact) {
+        try {
+          await TrackedContact.deleteOne({
+            userId: req.userId,
+            clientRef: client._id,
+          });
+          console.log(`📇 Removed tracked contact for: ${client.name}`);
+        } catch (tcErr) {
+          console.error("⚠️ Failed to remove tracked contact:", tcErr.message);
         }
       }
 

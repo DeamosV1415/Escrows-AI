@@ -12,6 +12,7 @@ interface Client {
   budget: number;
   requirements: string;
   nextAction: string;
+  nextActionPriority: "high" | "medium" | "low";
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -320,7 +321,35 @@ const ClientDetailModal: React.FC<Props> = ({
               {/* Next Action */}
               {client.nextAction && (
                 <div className="detail-modal__section">
-                  <h3 className="detail-modal__section-title">Next Action</h3>
+                  <h3 className="detail-modal__section-title">
+                    Next Action
+                    {client.nextActionPriority && (
+                      <span
+                        className={`detail-modal__priority-badge detail-modal__priority-badge--${client.nextActionPriority}`}
+                        style={{
+                          marginLeft: 8,
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontWeight: 500,
+                          background:
+                            client.nextActionPriority === "high"
+                              ? "rgba(204,68,68,0.12)"
+                              : client.nextActionPriority === "medium"
+                                ? "rgba(249,168,37,0.12)"
+                                : "rgba(76,175,80,0.12)",
+                          color:
+                            client.nextActionPriority === "high"
+                              ? "#c44"
+                              : client.nextActionPriority === "medium"
+                                ? "#b8860b"
+                                : "#4caf50",
+                        }}
+                      >
+                        {client.nextActionPriority}
+                      </span>
+                    )}
+                  </h3>
                   <p className="detail-modal__section-text">
                     {client.nextAction}
                   </p>

@@ -271,6 +271,20 @@ const InboxPage: React.FC = () => {
       setAddError("Name and email are required.");
       return;
     }
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(addForm.email.trim())) {
+      setAddError("Please enter a valid email (e.g. name@company.com).");
+      return;
+    }
+    // Phone validation if provided
+    if (addForm.phone.trim()) {
+      const digits = addForm.phone.replace(/\D/g, "");
+      if (digits.length < 7) {
+        setAddError("Phone number must have at least 7 digits.");
+        return;
+      }
+    }
     setAddError("");
     try {
       const res = await fetch("/api/contacts", {
@@ -1346,6 +1360,7 @@ const InboxPage: React.FC = () => {
                         value={addForm.name}
                         onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                         className="inbox__wa-input"
+                        required
                       />
                       <input
                         type="email"
@@ -1353,12 +1368,16 @@ const InboxPage: React.FC = () => {
                         value={addForm.email}
                         onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                         className="inbox__wa-input"
+                        required
                       />
                       <input
-                        type="text"
+                        type="tel"
                         placeholder="Phone (optional)"
                         value={addForm.phone}
-                        onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/[^\d+\-()\s]/g, "");
+                          setAddForm({ ...addForm, phone: cleaned });
+                        }}
                         className="inbox__wa-input"
                       />
                       {addError && <p className="inbox__wa-error">{addError}</p>}
@@ -1622,9 +1641,9 @@ const InboxPage: React.FC = () => {
               </button>
             </div>
             <div className="inbox__modal-body" style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px" }}>
-              <input className="inbox__wa-input" type="text" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-              <input className="inbox__wa-input" type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-              <input className="inbox__wa-input" type="text" placeholder="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+              <input className="inbox__wa-input" type="text" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+              <input className="inbox__wa-input" type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} required />
+              <input className="inbox__wa-input" type="tel" placeholder="Phone" value={editForm.phone} onChange={(e) => { const cleaned = e.target.value.replace(/[^\d+\-()\s]/g, ""); setEditForm({ ...editForm, phone: cleaned }); }} />
               <button className="inbox__connect-btn" style={{ width: "100%", padding: "10px", marginTop: "4px" }} onClick={() => handleEditContact(editingId!)}>
                 Save Changes
               </button>
