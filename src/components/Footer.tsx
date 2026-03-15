@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import "./Footer.css";
 
 const Footer: React.FC = () => {
@@ -37,8 +38,8 @@ const Footer: React.FC = () => {
             <div className="footer__links">
               <a href="#features">Features</a>
               <a href="#benefits">Benefits</a>
-              <a href="#about">About Us</a>
-              <a href="#contact">Contact</a>
+              <Link to="/about">About Us</Link>
+              <Link to="/contact">Contact</Link>
             </div>
           </div>
 
@@ -55,7 +56,12 @@ const Footer: React.FC = () => {
         <div className="footer__bottom">
           <p>© {new Date().getFullYear()} Escrows AI. All rights reserved.</p>
           <div className="footer__social">
-            <a href="#" aria-label="Twitter">
+            <a
+              href="#"
+              aria-label="Twitter"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <svg
                 width="18"
                 height="18"
@@ -65,7 +71,12 @@ const Footer: React.FC = () => {
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </a>
-            <a href="#" aria-label="LinkedIn">
+            <a
+              href="https://www.linkedin.com/company/escrows-ai/"
+              aria-label="LinkedIn"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <svg
                 width="18"
                 height="18"
