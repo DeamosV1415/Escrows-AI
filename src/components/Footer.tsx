@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import logoImg from "../assets/Logo.png";
 import "./Footer.css";
 
 const Footer: React.FC = () => {
@@ -7,23 +9,11 @@ const Footer: React.FC = () => {
         <div className="footer__inner">
           <div className="footer__brand">
             <a href="#" className="footer__logo">
-              <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-                <rect
-                  x="2"
-                  y="2"
-                  width="24"
-                  height="24"
-                  rx="6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M8 10h12M8 14h8M8 18h10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <img
+                src={logoImg}
+                alt="Escrows AI"
+                className="footer__logo-img"
+              />
               <span>Escrows AI</span>
             </a>
             <p className="footer__desc">
@@ -37,17 +27,17 @@ const Footer: React.FC = () => {
             <div className="footer__links">
               <a href="#features">Features</a>
               <a href="#benefits">Benefits</a>
-              <a href="#about">About Us</a>
-              <a href="#contact">Contact</a>
+              <Link to="/about">About Us</Link>
+              <Link to="/contact">Contact</Link>
             </div>
           </div>
 
           <div className="footer__links-group">
             <h4 className="footer__links-title">Legal</h4>
             <div className="footer__links">
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
-              <a href="#">Cookie Policy</a>
+              <Link to="/privacy-policy">Privacy Policy</Link>
+              <Link to="/terms-of-service">Terms of Service</Link>
+              <Link to="/cookie-policy">Cookie Policy</Link>
             </div>
           </div>
         </div>
@@ -55,7 +45,12 @@ const Footer: React.FC = () => {
         <div className="footer__bottom">
           <p>© {new Date().getFullYear()} Escrows AI. All rights reserved.</p>
           <div className="footer__social">
-            <a href="#" aria-label="Twitter">
+            <a
+              href="https://x.com/escrowsai"
+              aria-label="Twitter"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <svg
                 width="18"
                 height="18"
@@ -65,7 +60,12 @@ const Footer: React.FC = () => {
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </a>
-            <a href="#" aria-label="LinkedIn">
+            <a
+              href="https://www.linkedin.com/company/escrows-ai/"
+              aria-label="LinkedIn"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <svg
                 width="18"
                 height="18"
