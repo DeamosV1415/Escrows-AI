@@ -86,27 +86,23 @@ const AboutPage: React.FC = () => {
           <div className="about-story__text about-slide-left">
             <span className="about-story__label">/ our story /</span>
             <h2 className="about-story__heading">
-              Born from a frustration. Built with a purpose.
+              Born from a simple observation. Built for a real problem.
             </h2>
             <p className="about-story__paragraph">
-              In the fast-paced world of real estate, we watched deals slip
-              through the cracks — not because agents were careless, but because
-              the tools they relied on hadn't kept up. Manual spreadsheets,
-              forgotten follow-ups, and scattered communication cost brokerages
-              millions every year.
+              Real estate deals move fast — but the tools agents rely on often
+              don’t. Across brokerages, important tasks still happen in
+              spreadsheets, scattered messages, and manual follow-ups. Deals get
+              delayed, opportunities slip through, and teams spend more time
+              managing processes than closing transactions.
             </p>
             <p className="about-story__paragraph">
-              Three friends — an entrepreneur, an engineer, and an operator —
-              saw the same problem from different angles. Chinmay had spent
-              years watching deals stall because of poor client engagement; Aarv
-              knew AI could predict what humans missed; and Ayush understood the
-              operational gaps that bled revenue.
+              Escrows AI was created to change that.
             </p>
             <p className="about-story__paragraph">
-              So they joined forces. In late 2025, Escrows AI was born — not as
-              another CRM, but as an intelligent partner that thinks ahead,
-              automates the tedious, and lets agents focus on what matters:
-              building relationships and closing deals.
+              Instead of another traditional CRM, we’re building an intelligent
+              operating system for brokerages — an intelligent partner that
+              thinks ahead, automates the tedious, and lets agents focus on what
+              they do best: building relationships and closing deals.
             </p>
           </div>
 

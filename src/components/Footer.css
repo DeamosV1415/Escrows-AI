@@ -19,9 +19,15 @@
   gap: 10px;
   color: var(--olive-800);
   font-family: var(--font-heading);
-  font-size: 1.2rem;
+  font-size: 1.6rem;
   font-weight: 600;
   margin-bottom: 16px;
+}
+
+.footer__logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 .footer__desc {

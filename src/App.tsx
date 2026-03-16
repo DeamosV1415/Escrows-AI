@@ -11,6 +11,9 @@ import WaitlistModal from "./components/WaitlistModal";
 import ThreeBackground from "./components/ThreeBackground";
 import ContactPage from "./components/ContactPage";
 import AboutPage from "./components/AboutPage";
+import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
+import TermsOfServicePage from "./components/TermsOfServicePage";
+import CookiePolicyPage from "./components/CookiePolicyPage";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,6 +64,9 @@ function App() {
         />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+        <Route path="/cookie-policy" element={<CookiePolicyPage />} />
       </Routes>
       <Footer />
       <WaitlistModal isOpen={isModalOpen} onClose={closeWaitlist} />
