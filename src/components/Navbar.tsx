@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import "./Navbar.css";
 import LogoImg from "../assets/Logo.png";
 
@@ -9,6 +10,8 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  const isHome = location.pathname === "/";
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -16,17 +19,16 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { label: "Features", href: "#features" },
-    { label: "Benefits", href: "#benefits" },
-    { label: "About", href: "#about" },
-    { label: "Contact", href: "#contact" },
+  // Hash links: if not on home page, navigate to home first
+  const hashLinks = [
+    { label: "Features", hash: "#features" },
+    { label: "Benefits", hash: "#benefits" },
   ];
 
   return (
     <header className={`header ${scrolled ? "header--scrolled" : ""}`}>
       {/* Logo — outside navbar */}
-      <a href="#" className="header__logo">
+      <Link to="/" className="header__logo">
         <div className="header__logo-icon">
           <img
             src={LogoImg}
@@ -35,23 +37,48 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
           />
         </div>
         <span className="header__logo-text">Escrows AI</span>
-      </a>
+      </Link>
 
       {/* Glassmorphed Nav — only the 4 links */}
       <nav className="navbar-pill">
         <div
           className={`navbar-pill__links ${mobileOpen ? "navbar-pill__links--open" : ""}`}
         >
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="navbar-pill__link"
-              onClick={() => setMobileOpen(false)}
-            >
-              {link.label}
-            </a>
-          ))}
+          {hashLinks.map((link) =>
+            isHome ? (
+              <a
+                key={link.label}
+                href={link.hash}
+                className="navbar-pill__link"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.label}
+                to={`/${link.hash}`}
+                className="navbar-pill__link"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ),
+          )}
+          <Link
+            to="/about"
+            className={`navbar-pill__link ${location.pathname === "/about" ? "navbar-pill__link--active" : ""}`}
+            onClick={() => setMobileOpen(false)}
+          >
+            About
+          </Link>
+          <Link
+            to="/contact"
+            className={`navbar-pill__link ${location.pathname === "/contact" ? "navbar-pill__link--active" : ""}`}
+            onClick={() => setMobileOpen(false)}
+          >
+            Contact
+          </Link>
         </div>
       </nav>
 
@@ -77,16 +104,41 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="header__mobile-drawer">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="header__mobile-link"
-              onClick={() => setMobileOpen(false)}
-            >
-              {link.label}
-            </a>
-          ))}
+          {hashLinks.map((link) =>
+            isHome ? (
+              <a
+                key={link.label}
+                href={link.hash}
+                className="header__mobile-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.label}
+                to={`/${link.hash}`}
+                className="header__mobile-link"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ),
+          )}
+          <Link
+            to="/about"
+            className="header__mobile-link"
+            onClick={() => setMobileOpen(false)}
+          >
+            About
+          </Link>
+          <Link
+            to="/contact"
+            className="header__mobile-link"
+            onClick={() => setMobileOpen(false)}
+          >
+            Contact
+          </Link>
           <a
             href="/login"
             className="btn btn-outline header__mobile-cta"

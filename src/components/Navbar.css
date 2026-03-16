@@ -104,6 +104,12 @@
   background: rgba(85, 107, 47, 0.08);
 }
 
+.navbar-pill__link--active {
+  color: var(--olive-800);
+  background: rgba(85, 107, 47, 0.12);
+  font-weight: 500;
+}
+
 /* ─── CTA Buttons (right, outside navbar) ─── */
 
 .header__cta-group {

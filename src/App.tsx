@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./components/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
@@ -20,13 +20,24 @@ import InboxPage from "./pages/InboxPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import ContactPage from "./components/ContactPage";
+import AboutPage from "./components/AboutPage";
+import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
+import TermsOfServicePage from "./components/TermsOfServicePage";
+import CookiePolicyPage from "./components/CookiePolicyPage";
 
-/* ─── Landing Page ─── */
+/* ─── Landing Page (public-facing site with shared layout) ─── */
 function LandingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const location = useLocation();
 
   const openWaitlist = useCallback(() => setIsModalOpen(true), []);
   const closeWaitlist = useCallback(() => setIsModalOpen(false), []);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -44,19 +55,31 @@ function LandingPage() {
     elements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, []);
+  }, [location.pathname]);
 
   return (
     <>
       <ThreeBackground />
       <Navbar onJoinWaitlist={openWaitlist} />
-      <main>
-        <Hero onJoinWaitlist={openWaitlist} />
-        <IntroVideo />
-        <Features />
-        <Benefits />
-        <CTA onJoinWaitlist={openWaitlist} />
-      </main>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <main>
+              <Hero onJoinWaitlist={openWaitlist} />
+              <IntroVideo />
+              <Features />
+              <Benefits />
+              <CTA onJoinWaitlist={openWaitlist} />
+            </main>
+          }
+        />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+        <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+      </Routes>
       <Footer />
       <WaitlistModal isOpen={isModalOpen} onClose={closeWaitlist} />
     </>
@@ -69,9 +92,6 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Landing page */}
-          <Route path="/" element={<LandingPage />} />
-
           {/* Login / Signup */}
           <Route path="/login" element={<LoginPage />} />
 
@@ -94,6 +114,9 @@ function App() {
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
+
+          {/* Landing / public pages (catch-all) */}
+          <Route path="/*" element={<LandingPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
