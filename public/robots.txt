@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://escrowsai.com/sitemap.xml
