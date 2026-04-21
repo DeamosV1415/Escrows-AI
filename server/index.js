@@ -182,7 +182,7 @@ async function start() {
   }
 
   // ─── 404 handler for unknown API routes ───
-  app.use("/api/*", (req, res) => {
+  app.use("/api/{*splat}", (req, res) => {
     res.status(404).json({ error: "Endpoint not found." });
   });
 
