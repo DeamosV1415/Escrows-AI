@@ -1,10 +1,7 @@
+import { Link } from "react-router-dom";
 import "./Hero.css";
 
-interface HeroProps {
-  onJoinWaitlist: () => void;
-}
-
-const Hero: React.FC<HeroProps> = ({ onJoinWaitlist }) => {
+const Hero: React.FC = () => {
   return (
     <section className="hero" id="hero">
       <div className="container hero__container">
@@ -25,11 +22,11 @@ const Hero: React.FC<HeroProps> = ({ onJoinWaitlist }) => {
         </p>
 
         <div className="hero__actions fade-in-up">
-          <button
+          <Link
+            to="/login?mode=signup"
             className="btn btn-primary btn-large hero__cta"
-            onClick={onJoinWaitlist}
           >
-            Join the Waitlist
+            Get Started Free
             <svg
               width="18"
               height="18"
@@ -42,7 +39,7 @@ const Hero: React.FC<HeroProps> = ({ onJoinWaitlist }) => {
             >
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
-          </button>
+          </Link>
           <a href="#features" className="btn btn-secondary btn-large">
             Explore Features
           </a>

@@ -1,47 +1,9 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import "./CTA.css";
 
-interface CTAProps {
-  onJoinWaitlist: () => void;
-}
-
-const CTA: React.FC<CTAProps> = ({ onJoinWaitlist }) => {
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Waitlist User", email, company: "" }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
-
-      setSubmitted(true);
-      setEmail("");
-      setTimeout(() => setSubmitted(false), 4000);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to submit.";
-      setError(message);
-      setTimeout(() => setError(""), 4000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+const CTA: React.FC = () => {
   return (
-    <section className="cta section" id="contact">
+    <section className="cta section" id="cta">
       <div className="container">
         <div className="cta__card fade-in-up">
           <div className="cta__decoration cta__decoration--1"></div>
@@ -53,39 +15,54 @@ const CTA: React.FC<CTAProps> = ({ onJoinWaitlist }) => {
             Your Business?
           </h2>
           <p className="cta__subtitle">
-            Join the waitlist and be among the first to experience the future of
-            intelligent client management.
+            Start managing your clients smarter — with AI-powered follow-ups,
+            seamless document management, and insights that close deals faster.
           </p>
 
-          <form className="cta__form" onSubmit={handleSubmit}>
-            <div className="cta__input-wrapper">
-              <input
-                type="email"
-                className="cta__input"
-                placeholder="Enter your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-              <button
-                type="submit"
-                className="btn btn-primary cta__submit"
-                disabled={loading}
-              >
-                {submitted ? "✓ Added!" : loading ? "..." : "Join Waitlist"}
-              </button>
+          <div className="cta__features">
+            <div className="cta__feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>Free to get started</span>
             </div>
-            {error && <p className="cta__error">{error}</p>}
-          </form>
+            <div className="cta__feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>Setup in under 5 minutes</span>
+            </div>
+            <div className="cta__feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>No credit card required</span>
+            </div>
+          </div>
 
-          <p className="cta__note">
-            No spam. Early access + exclusive perks for waitlist members.
-          </p>
-
-          <button className="cta__alt-btn" onClick={onJoinWaitlist}>
-            Or fill out the full form →
-          </button>
+          <div className="cta__actions">
+            <Link to="/login?mode=signup" className="btn btn-light btn-large cta__primary-btn">
+              Get Started Free
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <Link to="/contact" className="cta__secondary-link">
+              Have questions? Contact us →
+            </Link>
+          </div>
         </div>
       </div>
     </section>
