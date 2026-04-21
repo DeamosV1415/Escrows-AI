@@ -171,7 +171,6 @@ const InboxPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [contactsLoading, setContactsLoading] = useState(false);
 
   // Message delete state
   const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
@@ -200,7 +199,6 @@ const InboxPage: React.FC = () => {
   /* ─── Fetch tracked contacts ─── */
   const fetchContacts = useCallback(async () => {
     if (!token) return;
-    setContactsLoading(true);
     try {
       const res = await fetch("/api/contacts", {
         headers: { Authorization: `Bearer ${token}` },
@@ -220,8 +218,6 @@ const InboxPage: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to fetch contacts:", err);
-    } finally {
-      setContactsLoading(false);
     }
   }, [token]);
 
