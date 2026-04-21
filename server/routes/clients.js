@@ -1,5 +1,10 @@
 import express from "express";
 
+// Escape special regex characters to prevent ReDoS
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export default function createClientsRouter(Client, InventoryItem, TrackedContact) {
   const router = express.Router();
 
@@ -12,7 +17,7 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
 
       // Search by name, email, or company
       if (search && search.trim()) {
-        const s = search.trim();
+        const s = escapeRegex(search.trim());
         filter.$or = [
           { name: { $regex: s, $options: "i" } },
           { email: { $regex: s, $options: "i" } },

@@ -38,6 +38,14 @@ const messageSchema = new mongoose.Schema(
     },
     timestamp: { type: Date, default: Date.now },
     rawPayload: { type: mongoose.Schema.Types.Mixed, default: null },
+    attachments: [
+      {
+        filename: { type: String },
+        mimeType: { type: String },
+        size: { type: Number, default: 0 },
+        attachmentId: { type: String }, // Gmail attachment ID for download
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -46,5 +54,6 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ userId: 1, contactIdentifier: 1, timestamp: -1 });
 messageSchema.index({ userId: 1, threadId: 1 });
 messageSchema.index({ externalId: 1 }, { sparse: true });
+messageSchema.index({ userId: 1, direction: 1, status: 1 }); // Fast unread count queries
 
 export default messageSchema;

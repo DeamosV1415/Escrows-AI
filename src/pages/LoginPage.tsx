@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 import "./LoginPage.css";
 
 /* ─── Google Identity Services types ─── */
@@ -32,12 +33,17 @@ declare global {
 const API_BASE = "/api/auth";
 
 export default function LoginPage() {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const location = useLocation();
+  const [isSignUp, setIsSignUp] = useState(
+    new URLSearchParams(location.search).get("mode") === "signup"
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<HCaptcha>(null);
 
   const { login, user } = useAuth();
   const navigate = useNavigate();
@@ -110,8 +116,13 @@ export default function LoginPage() {
 
     const endpoint = isSignUp ? `${API_BASE}/signup` : `${API_BASE}/login`;
     const body = isSignUp
-      ? { name: name.trim(), email, password }
-      : { email, password };
+      ? { name: name.trim(), email, password, captcha_token: captchaToken }
+      : { email, password, captcha_token: captchaToken };
+
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification.");
+      return;
+    }
 
     try {
       const res = await fetch(endpoint, {
@@ -127,6 +138,9 @@ export default function LoginPage() {
       setError(
         err instanceof Error ? err.message : "Failed. Please try again.",
       );
+      // Reset captcha on error
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -207,8 +221,25 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               autoComplete={isSignUp ? "new-password" : "current-password"}
+            />
+            {isSignUp && (
+              <p className="login-password-hint" style={{ fontSize: '12px', color: '#888', margin: '4px 0 0' }}>
+                Min. 8 chars: 1 uppercase, 1 lowercase, 1 number, 1 special character
+              </p>
+            )}
+          </div>
+
+          {/* hCaptcha */}
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0 16px' }}>
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY || "10000000-ffff-ffff-ffff-000000000001"}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+              theme="dark"
             />
           </div>
 
@@ -230,6 +261,8 @@ export default function LoginPage() {
             onClick={() => {
               setIsSignUp(!isSignUp);
               setError("");
+              captchaRef.current?.resetCaptcha();
+              setCaptchaToken(null);
             }}
           >
             {isSignUp ? "Sign In" : "Sign Up"}

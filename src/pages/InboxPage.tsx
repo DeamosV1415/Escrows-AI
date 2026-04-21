@@ -6,11 +6,19 @@ import React, {
   useCallback,
 } from "react";
 import { useAuth } from "../components/AuthContext";
+import * as XLSX from "xlsx";
 import "./InboxPage.css";
 
 /* ─── Types ─── */
 
 type Channel = "gmail" | "whatsapp" | "sms";
+
+interface Attachment {
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId: string;
+}
 
 interface Message {
   id: string;
@@ -18,6 +26,7 @@ interface Message {
   sent: boolean;
   time: string;
   subject?: string;
+  attachments?: Attachment[];
 }
 
 interface Conversation {
@@ -128,7 +137,14 @@ const InboxPage: React.FC = () => {
     "all" | "client" | "imported"
   >("all");
   const [importDragOver, setImportDragOver] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(680);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    total: number;
+    created: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
+  const [panelWidth, setPanelWidth] = useState(Math.round(window.innerWidth * 0.55));
   const isResizing = useRef(false);
 
   // Real connection status from API
@@ -252,16 +268,38 @@ const InboxPage: React.FC = () => {
     }
   }, [token]);
 
+  // Gmail sync — manual only (via Sync button)
+  const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
+
+  const triggerSync = useCallback(async () => {
+    if (!token || syncingRef.current) return;
+    syncingRef.current = true;
+    setSyncing(true);
+    try {
+      await fetch("/api/messages/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchConversations();
+    } catch {
+      // silently fail
+    } finally {
+      syncingRef.current = false;
+      setSyncing(false);
+    }
+  }, [token, fetchConversations]);
+
   useEffect(() => {
     fetchConnectionStatus();
     fetchContacts();
     fetchConversations();
   }, [fetchConnectionStatus, fetchContacts, fetchConversations]);
 
-  /* ─── Poll for new conversations every 30s ─── */
+  /* ─── Poll for new conversations every 60s ─── */
   useEffect(() => {
     if (!token) return;
-    const interval = setInterval(fetchConversations, 30000);
+    const interval = setInterval(fetchConversations, 60000);
     return () => clearInterval(interval);
   }, [token, fetchConversations]);
 
@@ -340,6 +378,117 @@ const InboxPage: React.FC = () => {
     } catch (err) {
       console.error("Failed to delete contact:", err);
     }
+  };
+
+  /* ─── Import contacts from CSV / Excel ─── */
+  const processImportFile = async (file: File) => {
+    if (!token) return;
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      if (rows.length === 0) {
+        setImportResult({ total: 0, created: 0, skipped: 0, errors: ["The file is empty or has no data rows."] });
+        setImporting(false);
+        return;
+      }
+
+      // Normalize header names (case-insensitive, trimmed)
+      const normalize = (key: string) => key.trim().toLowerCase().replace(/[^a-z]/g, "");
+      const findCol = (row: Record<string, unknown>, ...candidates: string[]) => {
+        for (const key of Object.keys(row)) {
+          const n = normalize(key);
+          if (candidates.some((c) => n === c || n.startsWith(c))) {
+            return String(row[key] ?? "").trim();
+          }
+        }
+        return "";
+      };
+
+      let created = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const name = findCol(row, "name", "fullname", "full name", "contactname");
+        const email = findCol(row, "email", "emailaddress", "mail");
+        const phone = findCol(row, "phone", "phonenumber", "mobile", "tel", "cell");
+
+        if (!name || !email) {
+          skipped++;
+          if (!name && !email) {
+            errors.push(`Row ${i + 2}: Missing name and email — skipped.`);
+          } else if (!name) {
+            errors.push(`Row ${i + 2}: Missing name — skipped.`);
+          } else {
+            errors.push(`Row ${i + 2}: Missing email — skipped.`);
+          }
+          continue;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(email)) {
+          skipped++;
+          errors.push(`Row ${i + 2}: Invalid email "${email}" — skipped.`);
+          continue;
+        }
+
+        try {
+          const res = await fetch("/api/contacts", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ name, email, phone }),
+          });
+
+          if (res.ok) {
+            created++;
+          } else if (res.status === 409) {
+            skipped++;
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            skipped++;
+            errors.push(`Row ${i + 2} (${email}): ${(errData as { error?: string }).error || "Failed"}`);
+          }
+        } catch {
+          skipped++;
+          errors.push(`Row ${i + 2} (${email}): Network error.`);
+        }
+      }
+
+      setImportResult({ total: rows.length, created, skipped, errors: errors.slice(0, 10) });
+      if (created > 0) {
+        await fetchContacts();
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      setImportResult({ total: 0, created: 0, skipped: 0, errors: ["Failed to parse file. Make sure it is a valid CSV or Excel file."] });
+    } finally {
+      setImporting(false);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImportFile = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (!ext || !["csv", "xlsx", "xls"].includes(ext)) {
+      setImportResult({ total: 0, created: 0, skipped: 0, errors: ["Unsupported file format. Please use .csv, .xlsx, or .xls."] });
+      return;
+    }
+    processImportFile(file);
   };
 
   /* ─── Listen for Gmail OAuth popup message ─── */
@@ -467,6 +616,18 @@ const InboxPage: React.FC = () => {
       prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)),
     );
 
+    // Mark messages as read on the server (persists across refreshes)
+    if (token) {
+      try {
+        await fetch(`/api/messages/read/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // non-critical, continue loading messages
+      }
+    }
+
     // Fetch actual messages from API
     if (!token) return;
     try {
@@ -487,6 +648,7 @@ const InboxPage: React.FC = () => {
               })
             : "",
           subject: m.subject || undefined,
+          attachments: m.attachments || [],
         }));
         setConversations((prev) =>
           prev.map((c) => (c.id === id ? { ...c, messages: mapped } : c)),
@@ -729,6 +891,31 @@ const InboxPage: React.FC = () => {
           <span className="inbox__subtitle">
             {counts.unread} unread · {counts.all} conversations
           </span>
+        </div>
+        <div className="inbox__topbar-actions">
+          <button
+            className="inbox__sync-btn"
+            onClick={triggerSync}
+            disabled={syncing}
+            title="Sync Gmail"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={syncing ? "inbox__sync-icon--spinning" : ""}
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+            {syncing ? "Syncing..." : "Sync"}
+          </button>
         </div>
       </div>
 
@@ -974,6 +1161,47 @@ const InboxPage: React.FC = () => {
                       <span className="inbox__msg-subject">{msg.subject}</span>
                     )}
                     {msg.text}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="inbox__msg-attachments">
+                        {msg.attachments.map((att, i) => (
+                          <a
+                            key={i}
+                            className="inbox__msg-attachment"
+                            href={`/api/messages/${msg.id}/attachment/${att.attachmentId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              try {
+                                const res = await fetch(
+                                  `/api/messages/${msg.id}/attachment/${att.attachmentId}`,
+                                  { headers: { Authorization: `Bearer ${token}` } }
+                                );
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = att.filename;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch {
+                                console.error("Download failed");
+                              }
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                            </svg>
+                            <span className="inbox__attachment-name">{att.filename}</span>
+                            <span className="inbox__attachment-size">
+                              {att.size > 1048576
+                                ? `${(att.size / 1048576).toFixed(1)} MB`
+                                : `${Math.round(att.size / 1024)} KB`}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     <button
                       className="inbox__msg-delete-btn"
                       title="Delete message"
@@ -1535,60 +1763,118 @@ const InboxPage: React.FC = () => {
               ) : (
                 /* ── Import Tab ── */
                 <>
-                  <div
-                    className={`inbox__import-zone ${importDragOver ? "inbox__import-zone--dragover" : ""}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setImportDragOver(true);
-                    }}
-                    onDragLeave={() => setImportDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setImportDragOver(false);
-                    }}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className="inbox__import-zone-icon">
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                  {importing ? (
+                    <div className="inbox__import-progress">
+                      <div className="inbox__import-spinner" />
+                      <h4>Importing contacts...</h4>
+                      <p>Parsing file and creating contacts. This may take a moment.</p>
+                    </div>
+                  ) : importResult ? (
+                    <div className="inbox__import-result">
+                      <div className="inbox__import-result-icon">
+                        {importResult.created > 0 ? (
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                          </svg>
+                        ) : (
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f9a825" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                        )}
+                      </div>
+                      <h4>{importResult.created > 0 ? "Import Complete" : "Import Finished"}</h4>
+                      <div className="inbox__import-stats">
+                        <span className="inbox__import-stat inbox__import-stat--created">✅ {importResult.created} created</span>
+                        <span className="inbox__import-stat inbox__import-stat--skipped">⏭️ {importResult.skipped} skipped</span>
+                        <span className="inbox__import-stat inbox__import-stat--total">📋 {importResult.total} total rows</span>
+                      </div>
+                      {importResult.errors.length > 0 && (
+                        <div className="inbox__import-errors">
+                          <strong>Issues:</strong>
+                          <ul>
+                            {importResult.errors.map((err, i) => (
+                              <li key={i}>{err}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <button
+                        className="inbox__connect-btn"
+                        style={{ marginTop: "14px", padding: "9px 24px" }}
+                        onClick={() => { setImportResult(null); setContactsTab("tracked"); }}
                       >
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
+                        View Contacts
+                      </button>
+                      <button
+                        className="inbox__disconnect-btn"
+                        style={{ marginTop: "8px", padding: "9px 24px" }}
+                        onClick={() => setImportResult(null)}
+                      >
+                        Import Another File
+                      </button>
                     </div>
-                    <h4>
-                      Drag & drop your file, or <span>browse</span>
-                    </h4>
-                    <p>Upload a CSV or Excel file with your contacts</p>
-                    <div className="inbox__import-formats">
-                      <span className="inbox__import-format-tag">.csv</span>
-                      <span className="inbox__import-format-tag">.xlsx</span>
-                      <span className="inbox__import-format-tag">.xls</span>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div
+                        className={`inbox__import-zone ${importDragOver ? "inbox__import-zone--dragover" : ""}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setImportDragOver(true);
+                        }}
+                        onDragLeave={() => setImportDragOver(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setImportDragOver(false);
+                          handleImportFile(e.dataTransfer.files);
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <div className="inbox__import-zone-icon">
+                          <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                          </svg>
+                        </div>
+                        <h4>
+                          Drag & drop your file, or <span>browse</span>
+                        </h4>
+                        <p>Upload a CSV or Excel file with your contacts</p>
+                        <div className="inbox__import-formats">
+                          <span className="inbox__import-format-tag">.csv</span>
+                          <span className="inbox__import-format-tag">.xlsx</span>
+                          <span className="inbox__import-format-tag">.xls</span>
+                        </div>
+                      </div>
 
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv,.xlsx,.xls"
-                    style={{ display: "none" }}
-                    onChange={() => {}}
-                  />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        style={{ display: "none" }}
+                        onChange={(e) => handleImportFile(e.target.files)}
+                      />
 
-                  <div className="inbox__import-note">
-                    <strong>Expected columns:</strong> Name, Email, Phone
-                    <br />
-                    The system will match imported contacts with your client
-                    database and begin surfacing their messages in the inbox.
-                  </div>
+                      <div className="inbox__import-note">
+                        <strong>Expected columns:</strong> Name, Email, Phone
+                        <br />
+                        The system will match imported contacts with your client
+                        database and begin surfacing their messages in the inbox.
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

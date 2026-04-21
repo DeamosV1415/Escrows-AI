@@ -3,11 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import "./Navbar.css";
 import LogoImg from "../assets/Logo.png";
 
-interface NavbarProps {
-  onJoinWaitlist: () => void;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
+const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -82,12 +78,10 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
         </div>
       </nav>
 
-      {/* CTAs — outside navbar */}
+      {/* CTA — Sign Up / Get Started */}
       <div className="header__cta-group">
-        <a href="/login" className="btn btn-outline header__cta">Sign Up</a>
-        <button className="btn btn-primary header__cta" onClick={onJoinWaitlist}>
-          Join Waitlist
-        </button>
+        <Link to="/login" className="btn btn-outline header__cta">Sign In</Link>
+        <Link to="/login?mode=signup" className="btn btn-primary header__cta">Get Started</Link>
       </div>
 
       {/* Mobile hamburger */}
@@ -139,22 +133,20 @@ const Navbar: React.FC<NavbarProps> = ({ onJoinWaitlist }) => {
           >
             Contact
           </Link>
-          <a
-            href="/login"
+          <Link
+            to="/login"
             className="btn btn-outline header__mobile-cta"
             onClick={() => setMobileOpen(false)}
           >
-            Sign Up
-          </a>
-          <button
+            Sign In
+          </Link>
+          <Link
+            to="/login?mode=signup"
             className="btn btn-primary header__mobile-cta"
-            onClick={() => {
-              onJoinWaitlist();
-              setMobileOpen(false);
-            }}
+            onClick={() => setMobileOpen(false)}
           >
-            Join Waitlist
-          </button>
+            Get Started
+          </Link>
         </div>
       )}
     </header>

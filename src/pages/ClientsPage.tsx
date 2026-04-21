@@ -139,7 +139,6 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this client?")) return;
     await deleteClient(id);
     setDetailClient(null);
     loadClients();

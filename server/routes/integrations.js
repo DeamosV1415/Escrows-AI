@@ -144,6 +144,7 @@ export default function createIntegrationsRouter(Connection) {
       console.log(`✅ Gmail connected for user ${userId}: ${gmailEmail}`);
 
       // Send a success page that closes the popup
+      const safeEmail = gmailEmail.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
       res.send(`
         <!DOCTYPE html>
         <html>
@@ -157,7 +158,7 @@ export default function createIntegrationsRouter(Connection) {
             </p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'GMAIL_CONNECTED', email: '${gmailEmail}' }, '*');
+                window.opener.postMessage({ type: 'GMAIL_CONNECTED', email: ${JSON.stringify(gmailEmail)} }, ${JSON.stringify(process.env.VITE_APP_URL || 'https://www.escrowsai.com')});
               }
               setTimeout(() => window.close(), 1500);
             </script>
@@ -166,6 +167,7 @@ export default function createIntegrationsRouter(Connection) {
       `);
     } catch (err) {
       console.error("Gmail OAuth callback error:", err.message);
+      const safeErrMsg = (err.message || 'Unknown error').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
       res.status(500).send(`
         <!DOCTYPE html>
         <html>
@@ -175,7 +177,7 @@ export default function createIntegrationsRouter(Connection) {
               ❌ Gmail connection failed
             </h2>
             <p style="font-family: sans-serif; text-align: center; color: #666;">
-              ${err.message}<br/>Please close this window and try again.
+              ${safeErrMsg}<br/>Please close this window and try again.
             </p>
           </body>
         </html>

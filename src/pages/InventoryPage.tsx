@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import DOMPurify from "dompurify";
 import "./InventoryPage.css";
 import { authFetch } from "../utils/authFetch";
 
@@ -315,6 +316,7 @@ const InventoryPage: React.FC = () => {
   const [previewContent, setPreviewContent] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string>("");
+  const [imageBlobUrl, setImageBlobUrl] = useState<string>("");
 
   // Folder metadata counts
   const [folderCounts, setFolderCounts] = useState<
@@ -525,6 +527,10 @@ const InventoryPage: React.FC = () => {
       URL.revokeObjectURL(pdfBlobUrl);
       setPdfBlobUrl("");
     }
+    if (imageBlobUrl) {
+      URL.revokeObjectURL(imageBlobUrl);
+      setImageBlobUrl("");
+    }
   };
 
   const openPreview = async (item: InventoryItem) => {
@@ -533,13 +539,22 @@ const InventoryPage: React.FC = () => {
     setPreviewItem(item);
     setPreviewContent("");
     setPdfBlobUrl("");
+    setImageBlobUrl("");
     setPreviewLoading(true);
 
     const ext = getFileExtension(item.name);
     const mime = item.mimeType || "";
 
-    // For images, we use the download URL directly
+    // For images, fetch as blob with auth headers
     if (mime.startsWith("image/")) {
+      try {
+        const res = await authFetch(`${API}/${item._id}/download`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setImageBlobUrl(url);
+      } catch (err) {
+        console.error(err);
+      }
       setPreviewLoading(false);
       return;
     }
@@ -966,21 +981,21 @@ const InventoryPage: React.FC = () => {
                 </div>
               ) : previewItem.mimeType === "application/pdf" && pdfBlobUrl ? (
                 <iframe src={pdfBlobUrl} title={previewItem.name} />
-              ) : previewItem.mimeType?.startsWith("image/") ? (
+              ) : previewItem.mimeType?.startsWith("image/") && imageBlobUrl ? (
                 <img
-                  src={`${API}/${previewItem._id}/download`}
+                  src={imageBlobUrl}
                   alt={previewItem.name}
                 />
               ) : previewContent ? (
                 ["xlsx", "xls"].includes(getFileExtension(previewItem.name)) ? (
                   <div
                     className="inv__preview-table-wrap"
-                    dangerouslySetInnerHTML={{ __html: previewContent }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
                   />
                 ) : (
                   <div
                     className="inv__preview-docx"
-                    dangerouslySetInnerHTML={{ __html: previewContent }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
                   />
                 )
               ) : (

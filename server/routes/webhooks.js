@@ -1,6 +1,11 @@
 import express from "express";
 import { createGmailClient } from "../utils/gmailClient.js";
 
+// Escape special regex characters to prevent ReDoS
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Webhook routes for external services (Gmail Pub/Sub, WhatsApp).
  * These routes do NOT use authMiddleware since they're called by external services.
@@ -264,13 +269,13 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
               // Match against tracked contacts
               const trackedContact = await TrackedContact.findOne({
                 userId,
-                phone: { $regex: senderPhone.slice(-10), $options: "i" },
+                phone: { $regex: escapeRegex(senderPhone.slice(-10)), $options: "i" },
               });
 
               // Also check clients
               const client = await Client.findOne({
                 userId,
-                phone: { $regex: senderPhone.slice(-10), $options: "i" },
+                phone: { $regex: escapeRegex(senderPhone.slice(-10)), $options: "i" },
               });
 
               // Only store messages from tracked contacts or clients

@@ -1,6 +1,7 @@
 import { useState, useRef, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import emailjs from "@emailjs/browser";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 import "./ContactPage.css";
 
 const ContactPage: React.FC = () => {
@@ -8,6 +9,8 @@ const ContactPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<HCaptcha>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -15,6 +18,12 @@ const ContactPage: React.FC = () => {
 
     setSending(true);
     setError("");
+
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification.");
+      setSending(false);
+      return;
+    }
 
     try {
       await emailjs.sendForm(
@@ -27,6 +36,8 @@ const ContactPage: React.FC = () => {
       formRef.current.reset();
     } catch {
       setError("Something went wrong. Please try again later.");
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setSending(false);
     }
@@ -163,6 +174,17 @@ const ContactPage: React.FC = () => {
                   Your message has been sent successfully!
                 </p>
               )}
+
+              {/* hCaptcha */}
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                <HCaptcha
+                  ref={captchaRef}
+                  sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY || "10000000-ffff-ffff-ffff-000000000001"}
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                />
+              </div>
 
               <button
                 type="submit"

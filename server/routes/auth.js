@@ -4,7 +4,33 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 
 function generateToken(userId) {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "24h" });
+}
+
+// ─── hCaptcha server-side verification ───
+async function verifyCaptcha(token) {
+  if (!process.env.HCAPTCHA_SECRET_KEY) {
+    console.warn("⚠️ HCAPTCHA_SECRET_KEY not set — skipping captcha verification");
+    return true; // Skip in dev if not configured
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.append("response", token);
+    params.append("secret", process.env.HCAPTCHA_SECRET_KEY);
+
+    const res = await fetch("https://api.hcaptcha.com/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+
+    const data = await res.json();
+    return data.success === true;
+  } catch (err) {
+    console.error("hCaptcha verification error:", err.message);
+    return false;
+  }
 }
 
 export default function createAuthRouter(User) {
@@ -13,7 +39,12 @@ export default function createAuthRouter(User) {
   // ─── POST /api/auth/signup ───
   router.post("/signup", async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const { name, email, password, captcha_token } = req.body;
+
+      // Verify hCaptcha
+      if (!captcha_token || !(await verifyCaptcha(captcha_token))) {
+        return res.status(400).json({ error: "CAPTCHA verification failed. Please try again." });
+      }
 
       if (!name || !email || !password) {
         return res
@@ -21,10 +52,19 @@ export default function createAuthRouter(User) {
           .json({ error: "Name, email, and password are required." });
       }
 
-      if (password.length < 6) {
+      if (password.length < 8) {
         return res
           .status(400)
-          .json({ error: "Password must be at least 6 characters." });
+          .json({ error: "Password must be at least 8 characters." });
+      }
+
+      // Strong password policy: uppercase, lowercase, number, special char
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+          error:
+            "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.",
+        });
       }
 
       // Check if user already exists
@@ -58,7 +98,12 @@ export default function createAuthRouter(User) {
   // ─── POST /api/auth/login ───
   router.post("/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { email, password, captcha_token } = req.body;
+
+      // Verify hCaptcha
+      if (!captcha_token || !(await verifyCaptcha(captcha_token))) {
+        return res.status(400).json({ error: "CAPTCHA verification failed. Please try again." });
+      }
 
       if (!email || !password) {
         return res

@@ -11,6 +11,5 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    allowedHosts: ["antonia-untaloned-serafina.ngrok-free.dev"],
   },
 });

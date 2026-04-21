@@ -1,5 +1,10 @@
 import express from "express";
 
+// Escape special regex characters to prevent ReDoS
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export default function createContactsRouter(TrackedContact, Client) {
   const router = express.Router();
 
@@ -15,7 +20,7 @@ export default function createContactsRouter(TrackedContact, Client) {
       }
 
       if (search && search.trim()) {
-        const s = search.trim();
+        const s = escapeRegex(search.trim());
         filter.$or = [
           { name: { $regex: s, $options: "i" } },
           { email: { $regex: s, $options: "i" } },

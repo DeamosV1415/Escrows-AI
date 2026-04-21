@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./components/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -9,7 +9,6 @@ import Features from "./components/Features";
 import Benefits from "./components/Benefits";
 import CTA from "./components/CTA";
 import Footer from "./components/Footer";
-import WaitlistModal from "./components/WaitlistModal";
 import ThreeBackground from "./components/ThreeBackground";
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardPage from "./pages/DashboardPage";
@@ -28,11 +27,7 @@ import CookiePolicyPage from "./components/CookiePolicyPage";
 
 /* ─── Landing Page (public-facing site with shared layout) ─── */
 function LandingPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const location = useLocation();
-
-  const openWaitlist = useCallback(() => setIsModalOpen(true), []);
-  const closeWaitlist = useCallback(() => setIsModalOpen(false), []);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -60,17 +55,17 @@ function LandingPage() {
   return (
     <>
       <ThreeBackground />
-      <Navbar onJoinWaitlist={openWaitlist} />
+      <Navbar />
       <Routes>
         <Route
           path="/"
           element={
             <main>
-              <Hero onJoinWaitlist={openWaitlist} />
+              <Hero />
               <IntroVideo />
               <Features />
               <Benefits />
-              <CTA onJoinWaitlist={openWaitlist} />
+              <CTA />
             </main>
           }
         />
@@ -81,7 +76,6 @@ function LandingPage() {
         <Route path="/cookie-policy" element={<CookiePolicyPage />} />
       </Routes>
       <Footer />
-      <WaitlistModal isOpen={isModalOpen} onClose={closeWaitlist} />
     </>
   );
 }

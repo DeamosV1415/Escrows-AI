@@ -131,6 +131,7 @@ const ClientDetailModal: React.FC<Props> = ({
   const [notes, setNotes] = useState(client.notes || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -219,7 +220,7 @@ const ClientDetailModal: React.FC<Props> = ({
             </button>
             <button
               className="detail-modal__delete-btn"
-              onClick={() => onDelete(client._id)}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               <svg
                 width="14"
@@ -467,6 +468,52 @@ const ClientDetailModal: React.FC<Props> = ({
           )}
         </div>
       </div>
+
+      {/* ═══ Delete Client Confirmation Modal ═══ */}
+      {showDeleteConfirm && (
+        <div
+          className="detail-modal__confirm-overlay"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="detail-modal__confirm-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="detail-modal__confirm-header">
+              <h3>Delete Client</h3>
+              <button
+                className="detail-modal__close"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="detail-modal__confirm-body">
+              <p>Are you sure you want to delete <strong>{client.name}</strong>? This action cannot be undone.</p>
+              <div className="detail-modal__confirm-actions">
+                <button
+                  className="detail-modal__confirm-cancel"
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="detail-modal__confirm-delete"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    onDelete(client._id);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

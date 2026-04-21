@@ -1,9 +1,33 @@
 import express from "express";
+import mongoose from "mongoose";
 import { createGmailClient } from "../utils/gmailClient.js";
 import { decrypt } from "../utils/encryption.js";
+import { syncGmailMessages } from "../utils/gmailSync.js";
 
-export default function createMessagesRouter(Connection, Message) {
+export default function createMessagesRouter(Connection, Message, TrackedContact, Client) {
   const router = express.Router();
+
+  // ─── POST /api/messages/sync ───
+  // Trigger an on-demand Gmail sync for the current user
+  router.post("/sync", async (req, res) => {
+    try {
+      const connection = await Connection.findOne({
+        userId: req.userId,
+        channel: "gmail",
+        status: "connected",
+      });
+
+      if (!connection) {
+        return res.json({ success: true, newMessages: 0, message: "Gmail not connected." });
+      }
+
+      const newCount = await syncGmailMessages(connection, Message, TrackedContact, Client);
+      res.json({ success: true, newMessages: newCount });
+    } catch (err) {
+      console.error("Sync error:", err.message);
+      res.status(500).json({ error: "Sync failed." });
+    }
+  });
 
   // ─── GET /api/messages/conversations ───
   // List conversations grouped by contact for the logged-in user
@@ -52,8 +76,6 @@ export default function createMessagesRouter(Connection, Message) {
         { $sort: { lastTime: -1 } },
       ]);
 
-      // Convert ObjectId userId for match (aggregate doesn't auto-cast)
-      const mongoose = (await import("mongoose")).default;
       const objectUserId = new mongoose.Types.ObjectId(userId);
 
       const conversationsWithUserId = await Message.aggregate([
@@ -94,6 +116,47 @@ export default function createMessagesRouter(Connection, Message) {
     } catch (err) {
       console.error("Error fetching conversations:", err.message);
       res.status(500).json({ error: "Failed to fetch conversations." });
+    }
+  });
+
+  // ─── GET /api/messages/unread-count ───
+  // Return total unread message count for sidebar badge
+  router.get("/unread-count", async (req, res) => {
+    try {
+      const count = await Message.countDocuments({
+        userId: new mongoose.Types.ObjectId(req.userId),
+        direction: "inbound",
+        status: { $ne: "read" },
+      });
+      res.json({ unreadCount: count });
+    } catch (err) {
+      console.error("Error fetching unread count:", err.message);
+      res.status(500).json({ error: "Failed to fetch unread count." });
+    }
+  });
+
+  // ─── PATCH /api/messages/read/:contactIdentifier ───
+  // Mark all inbound messages from a contact as "read"
+  router.patch("/read/:contactIdentifier", async (req, res) => {
+    try {
+      const objectUserId = new mongoose.Types.ObjectId(req.userId);
+      const result = await Message.updateMany(
+        {
+          userId: objectUserId,
+          contactIdentifier: req.params.contactIdentifier,
+          direction: "inbound",
+          status: { $ne: "read" },
+        },
+        { $set: { status: "read" } },
+      );
+
+      console.log(
+        `✉️ Marked ${result.modifiedCount} messages as read for ${req.params.contactIdentifier}`
+      );
+      res.json({ success: true, modifiedCount: result.modifiedCount });
+    } catch (err) {
+      console.error("Error marking messages as read:", err.message);
+      res.status(500).json({ error: "Failed to mark messages as read." });
     }
   });
 
@@ -310,6 +373,59 @@ export default function createMessagesRouter(Connection, Message) {
     } catch (err) {
       console.error("Error deleting message:", err.message);
       res.status(500).json({ error: "Failed to delete message." });
+    }
+  });
+
+  // ─── GET /api/messages/:id/attachment/:attachmentId ───
+  // Download an email attachment via Gmail API
+  router.get("/:id/attachment/:attachmentId", async (req, res) => {
+    try {
+      const message = await Message.findOne({
+        _id: req.params.id,
+        userId: req.userId,
+      }).lean();
+
+      if (!message) {
+        return res.status(404).json({ error: "Message not found." });
+      }
+
+      // Find the attachment metadata
+      const attachment = (message.attachments || []).find(
+        (a) => a.attachmentId === req.params.attachmentId
+      );
+
+      if (!attachment) {
+        return res.status(404).json({ error: "Attachment not found." });
+      }
+
+      // Fetch from Gmail API
+      const connection = await Connection.findOne({
+        userId: req.userId,
+        channel: "gmail",
+        status: "connected",
+      });
+
+      if (!connection) {
+        return res.status(400).json({ error: "Gmail not connected." });
+      }
+
+      const { gmail } = createGmailClient(connection);
+      const attachmentData = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId: message.externalId,
+        id: req.params.attachmentId,
+      });
+
+      // Gmail returns base64url-encoded data
+      const buffer = Buffer.from(attachmentData.data.data, "base64");
+
+      res.setHeader("Content-Type", attachment.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${attachment.filename}"`);
+      res.setHeader("Content-Length", buffer.length);
+      res.send(buffer);
+    } catch (err) {
+      console.error("Error downloading attachment:", err.message);
+      res.status(500).json({ error: "Failed to download attachment." });
     }
   });
 

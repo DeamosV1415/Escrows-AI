@@ -26,9 +26,49 @@ const storage = multer.diskStorage({
   },
 });
 
+// Allowed file types for upload
+const ALLOWED_EXTENSIONS = new Set([
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+  ".jpg", ".jpeg", ".png", ".gif", ".webp",
+  ".csv", ".txt",
+]);
+
+const ALLOWED_MIMES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "text/csv",
+  "text/plain",
+]);
+
+// Sanitize filename — strip path traversal and dangerous characters
+function sanitizeFilename(name) {
+  return name
+    .replace(/[/\\]/g, "_") // Replace path separators
+    .replace(/\.\./g, "_")  // Remove directory traversal
+    .replace(/[^a-zA-Z0-9._\- ]/g, "_") // Keep only safe chars
+    .substring(0, 200); // Limit length
+}
+
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      return cb(new Error(`File type ${ext} is not allowed.`));
+    }
+    if (!ALLOWED_MIMES.has(file.mimetype)) {
+      return cb(new Error(`MIME type ${file.mimetype} is not allowed.`));
+    }
+    cb(null, true);
+  },
 });
 
 export default function createInventoryRouter(InventoryItem) {
@@ -44,7 +84,7 @@ export default function createInventoryRouter(InventoryItem) {
       if (clientId) filter.clientId = new mongoose.Types.ObjectId(clientId);
 
       if (search && search.trim()) {
-        const s = search.trim();
+        const s = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         filter.name = { $regex: s, $options: "i" };
       } else {
         // Browsing a specific folder
@@ -170,7 +210,15 @@ export default function createInventoryRouter(InventoryItem) {
   });
 
   // ─── POST /api/inventory/upload ───
-  router.post("/upload", upload.single("file"), async (req, res) => {
+  router.post("/upload", (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err) {
+        const message = err.message || "File upload failed.";
+        return res.status(400).json({ error: message });
+      }
+      next();
+    });
+  }, async (req, res) => {
     try {
       const { clientId, parentId } = req.body;
       const file = req.file;
@@ -181,10 +229,12 @@ export default function createInventoryRouter(InventoryItem) {
           .json({ error: "clientId and file are required." });
       }
 
+      const safeName = sanitizeFilename(file.originalname);
+
       const item = new InventoryItem({
         userId: req.userId,
         clientId,
-        name: file.originalname,
+        name: safeName,
         type: "file",
         mimeType: file.mimetype,
         size: file.size,
@@ -193,7 +243,7 @@ export default function createInventoryRouter(InventoryItem) {
       });
 
       await item.save();
-      console.log(`📄 File uploaded: ${file.originalname}`);
+      console.log(`📄 File uploaded: ${safeName}`);
       res.status(201).json(item.toObject());
     } catch (err) {
       console.error("Error uploading file:", err.message);

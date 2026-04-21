@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { authFetch } from "../../utils/authFetch";
@@ -145,11 +145,12 @@ interface ProfileData {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
-  const { user, logout, updateUser } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [popupOpen, setPopupOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [profileData, setProfileData] = useState<ProfileData>({
     phone: "",
     company: "",
@@ -173,6 +174,28 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     if (popupOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [popupOpen]);
+
+  // Fetch unread count from messages API
+  const fetchUnreadCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/messages/unread-count", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch {
+      // silently fail
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   // Load profile data when opening edit mode
   const openEditMode = async () => {
@@ -298,8 +321,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
               {!collapsed && (
                 <span className="sidebar__link-label">{item.label}</span>
               )}
-              {!collapsed && item.label === "Inbox" && (
-                <span className="sidebar__badge">3</span>
+              {!collapsed && item.label === "Inbox" && unreadCount > 0 && (
+                <span className="sidebar__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
               )}
             </NavLink>
           ))}
