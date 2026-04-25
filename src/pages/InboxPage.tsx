@@ -144,7 +144,7 @@ const InboxPage: React.FC = () => {
     skipped: number;
     errors: string[];
   } | null>(null);
-  const [panelWidth, setPanelWidth] = useState(Math.round(window.innerWidth * 0.55));
+  const [panelWidth, setPanelWidth] = useState(Math.round(window.innerWidth * 0.68));
   const isResizing = useRef(false);
 
   // Real connection status from API
@@ -176,6 +176,14 @@ const InboxPage: React.FC = () => {
   const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
   const [deleteConvId, setDeleteConvId] = useState<string | null>(null);
   const [sendingReply, setSendingReply] = useState(false);
+
+  // Draft compose state — for DM button (does NOT add to conversation list)
+  const [draftCompose, setDraftCompose] = useState<{
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string;
+    channel: Channel;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -533,6 +541,20 @@ const InboxPage: React.FC = () => {
 
   const activeConv = conversations.find((c) => c.id === activeChat) || null;
 
+  // Virtual conversation object for draft compose (DM button with no prior conversation)
+  const displayConv: Conversation | null = activeConv || (draftCompose ? {
+    id: draftCompose.contactEmail,
+    contactName: draftCompose.contactName,
+    contactEmail: draftCompose.contactEmail,
+    contactPhone: draftCompose.contactPhone,
+    channel: draftCompose.channel,
+    lastMessage: "",
+    lastTime: "Now",
+    unread: 0,
+    priority: false,
+    messages: [],
+  } : null);
+
   const counts = useMemo(() => {
     return {
       all: conversations.length,
@@ -608,6 +630,7 @@ const InboxPage: React.FC = () => {
 
   const openChat = async (id: string) => {
     setActiveChat(id);
+    setDraftCompose(null); // Clear any draft when opening a real conversation
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)),
     );
@@ -660,7 +683,8 @@ const InboxPage: React.FC = () => {
   };
 
   const handleSend = async () => {
-    if (!replyText.trim() || !activeChat || !activeConv || !token) return;
+    const targetConv = displayConv;
+    if (!replyText.trim() || !targetConv || !token) return;
     setSendingReply(true);
     try {
       const res = await fetch("/api/messages/send", {
@@ -670,12 +694,12 @@ const InboxPage: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          contactIdentifier: activeChat,
+          contactIdentifier: targetConv.contactEmail || targetConv.id,
           body: replyText.trim(),
-          channel: activeConv.channel,
-          subject: (activeConv as any).lastSubject || undefined,
-          threadId: (activeConv as any).threadId || undefined,
-          contactName: activeConv.contactName,
+          channel: targetConv.channel,
+          subject: (targetConv as any).lastSubject || undefined,
+          threadId: (targetConv as any).threadId || undefined,
+          contactName: targetConv.contactName,
         }),
       });
       if (res.ok) {
@@ -691,19 +715,28 @@ const InboxPage: React.FC = () => {
           }),
           subject: sentMsg.subject || undefined,
         };
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === activeChat
-              ? {
-                  ...c,
-                  messages: [...c.messages, newMsg],
-                  lastMessage: newMsg.text,
-                  lastTime: "Just now",
-                }
-              : c,
-          ),
-        );
-        setReplyText("");
+
+        if (draftCompose) {
+          // Draft compose: message sent successfully — refresh conversations and open the new one
+          setDraftCompose(null);
+          setReplyText("");
+          await fetchConversations();
+          setActiveChat(targetConv.contactEmail || targetConv.id);
+        } else {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === activeChat
+                ? {
+                    ...c,
+                    messages: [...c.messages, newMsg],
+                    lastMessage: newMsg.text,
+                    lastTime: "Just now",
+                  }
+                : c,
+            ),
+          );
+          setReplyText("");
+        }
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 50);
@@ -1048,13 +1081,13 @@ const InboxPage: React.FC = () => {
         </div>
 
         {/* ── Right: Conversation or Empty ── */}
-        {activeConv ? (
+        {displayConv ? (
           <div className="inbox__conversation">
             <div className="inbox__conv-header">
               <div className="inbox__conv-header-left">
                 <button
                   className="inbox__mobile-back"
-                  onClick={() => setActiveChat(null)}
+                  onClick={() => { setActiveChat(null); setDraftCompose(null); }}
                 >
                   <svg
                     width="16"
@@ -1070,25 +1103,30 @@ const InboxPage: React.FC = () => {
                   </svg>
                 </button>
                 <div
-                  className={`inbox__conv-avatar inbox__conv-avatar--${activeConv.channel}`}
+                  className={`inbox__conv-avatar inbox__conv-avatar--${displayConv.channel}`}
                 >
-                  {getInitials(activeConv.contactName)}
+                  {getInitials(displayConv.contactName)}
                 </div>
                 <div className="inbox__conv-info">
-                  <h3>{activeConv.contactName}</h3>
+                  <h3>{displayConv.contactName}</h3>
                   <div className="inbox__conv-meta">
                     <span
-                      className={`inbox__channel-badge inbox__channel-badge--${activeConv.channel}`}
+                      className={`inbox__channel-badge inbox__channel-badge--${displayConv.channel}`}
                     >
-                      {CHANNEL_LABELS[activeConv.channel]}
+                      {CHANNEL_LABELS[displayConv.channel]}
                     </span>
                     <span className="inbox__conv-email">
-                      {activeConv.contactEmail || activeConv.contactPhone}
+                      {displayConv.contactEmail || displayConv.contactPhone}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="inbox__conv-actions">
+                  {draftCompose && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--olive-600)', fontWeight: 600, background: 'var(--olive-100)', padding: '4px 10px', borderRadius: '6px', marginRight: '8px' }}>
+                      New Message
+                    </span>
+                  )}
                 <button className="inbox__conv-action-btn" title="Star">
                   <svg
                     width="16"
@@ -1122,7 +1160,7 @@ const InboxPage: React.FC = () => {
                 <button
                   className="inbox__conv-action-btn inbox__conv-action-btn--delete"
                   title="Delete Conversation"
-                  onClick={() => setDeleteConvId(activeConv.id)}
+                  onClick={() => setDeleteConvId(displayConv.id)}
                 >
                   <svg
                     width="16"
@@ -1147,7 +1185,7 @@ const InboxPage: React.FC = () => {
               <div className="inbox__date-sep">
                 <span>Today</span>
               </div>
-              {activeConv.messages.map((msg) => (
+              {displayConv.messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`inbox__msg inbox__msg--${msg.sent ? "sent" : "received"}`}
@@ -1221,18 +1259,18 @@ const InboxPage: React.FC = () => {
             <div className="inbox__composer">
               <div className="inbox__composer-channel">
                 <span
-                  className={`inbox__composer-channel-dot inbox__composer-channel-dot--${activeConv.channel}`}
+                  className={`inbox__composer-channel-dot inbox__composer-channel-dot--${displayConv.channel}`}
                 />
-                Replying via {CHANNEL_LABELS[activeConv.channel]}
-                {activeConv.contactEmail && ` · ${activeConv.contactEmail}`}
-                {activeConv.contactPhone &&
-                  !activeConv.contactEmail &&
-                  ` · ${activeConv.contactPhone}`}
+                {draftCompose ? 'Composing via' : 'Replying via'} {CHANNEL_LABELS[displayConv.channel]}
+                {displayConv.contactEmail && ` · ${displayConv.contactEmail}`}
+                {displayConv.contactPhone &&
+                  !displayConv.contactEmail &&
+                  ` · ${displayConv.contactPhone}`}
               </div>
               <div className="inbox__composer-row">
                 <textarea
                   className="inbox__composer-input"
-                  placeholder={`Message ${activeConv.contactName}...`}
+                  placeholder={`Message ${displayConv.contactName}...`}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1660,7 +1698,7 @@ const InboxPage: React.FC = () => {
                           <th>Phone</th>
                           <th>Source</th>
                           <th>Channels</th>
-                          <th style={{ width: "70px" }}>Actions</th>
+                          <th style={{ width: "100px" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1725,6 +1763,35 @@ const InboxPage: React.FC = () => {
                             </td>
                             <td>
                               <div className="inbox__contact-actions">
+                                <button
+                                  className="inbox__contact-action-icon inbox__contact-action-icon--dm"
+                                  title="Direct Message"
+                                  onClick={() => {
+                                    // Close the contacts panel
+                                    setShowContactsPanel(false);
+                                    // Check if there's an existing conversation for this contact
+                                    const existingConv = conversations.find(
+                                      (c) => c.contactEmail === contact.email || c.id === contact.email
+                                    );
+                                    if (existingConv) {
+                                      openChat(existingConv.id);
+                                    } else {
+                                      // Set draft compose — shows compose panel without adding to conversation list
+                                      setActiveChat(null);
+                                      setDraftCompose({
+                                        contactName: contact.name,
+                                        contactEmail: contact.email,
+                                        contactPhone: contact.phone,
+                                        channel: "gmail" as Channel,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13" />
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                  </svg>
+                                </button>
                                 <button
                                   className="inbox__contact-action-icon"
                                   title="Edit"

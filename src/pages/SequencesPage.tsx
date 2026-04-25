@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./SequencesPage.css";
 
 /* ─── Dummy Data ─── */
@@ -94,8 +95,46 @@ const SendIcon = () => (
 
 /* ─── Page ─── */
 const SequencesPage: React.FC = () => {
+  const [showBanner, setShowBanner] = useState(true);
+
   return (
     <div className="sequences">
+      {/* Admin Dev Banner */}
+      {showBanner && (
+        <div className="sequences__dev-banner" id="sequences-dev-banner">
+          <div className="sequences__dev-banner-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 20h20" />
+              <path d="M5 20V8.5L12 4l7 4.5V20" />
+              <path d="M9 20v-4h6v4" />
+              <path d="M3 20l1.5-4.5" />
+              <path d="M21 20l-1.5-4.5" />
+              <path d="M10 11h4" />
+            </svg>
+          </div>
+          <div className="sequences__dev-banner-body">
+            <div className="sequences__dev-banner-label">System Notice</div>
+            <div className="sequences__dev-banner-title">
+              🚧 This page is currently under development
+            </div>
+            <div className="sequences__dev-banner-desc">
+              What you see below is an early preview of how Follow-Up Sequences will look and function.
+              Features are not yet interactive. Stay tuned for updates!
+            </div>
+          </div>
+          <button
+            className="sequences__dev-banner-dismiss"
+            onClick={() => setShowBanner(false)}
+            aria-label="Dismiss notice"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="sequences__header">
         <div className="sequences__header-text">
