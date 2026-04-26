@@ -25,6 +25,7 @@ interface Crumb {
 
 /* ─── API ─── */
 const API = "/api/inventory";
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 async function fetchItems(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString();
@@ -50,15 +51,6 @@ async function createFolder(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create folder");
-  return res.json();
-}
-
-async function uploadFile(formData: FormData) {
-  const res = await authFetch(`${API}/upload`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) throw new Error("Failed to upload file");
   return res.json();
 }
 
@@ -302,6 +294,9 @@ const InventoryPage: React.FC = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile_, setUploadFile_] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [fileSizeError, setFileSizeError] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Inline rename
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -443,8 +438,13 @@ const InventoryPage: React.FC = () => {
   /* ─── Upload ─── */
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const selectFile = (file: File) => {
+    setUploadFile_(file);
+    setFileSizeError(file.size > MAX_FILE_SIZE);
+  };
+
   const handleUpload = async () => {
-    if (!uploadFile_) return;
+    if (!uploadFile_ || fileSizeError || uploading) return;
 
     let clientId = activeClientId;
     if (!clientId && breadcrumbs.length > 0) {
@@ -465,14 +465,41 @@ const InventoryPage: React.FC = () => {
     formData.append("clientId", clientId);
     if (currentFolderId) formData.append("parentId", currentFolderId);
 
+    setUploading(true);
+    setUploadProgress(0);
+
     try {
-      await uploadFile(formData);
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API}/upload`);
+
+        const token = localStorage.getItem("escrows_token");
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(xhr.responseText || "Upload failed"));
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(formData);
+      });
+
       setUploadOpen(false);
       setUploadFile_(null);
+      setFileSizeError(false);
       loadItems();
     } catch (err) {
       console.error(err);
       alert("Failed to upload file.");
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -480,7 +507,7 @@ const InventoryPage: React.FC = () => {
     e.preventDefault();
     setDragActive(false);
     if (e.dataTransfer.files.length > 0) {
-      setUploadFile_(e.dataTransfer.files[0]);
+      selectFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -842,18 +869,53 @@ const InventoryPage: React.FC = () => {
       {uploadOpen && (
         <div
           className="inv__modal-backdrop"
-          onClick={() => setUploadOpen(false)}
+          onClick={() => {
+            if (!uploading) setUploadOpen(false);
+          }}
         >
           <div className="inv__modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="inv__modal-close"
-              onClick={() => setUploadOpen(false)}
-            >
-              <CloseIcon />
-            </button>
+            {!uploading && (
+              <button
+                className="inv__modal-close"
+                onClick={() => setUploadOpen(false)}
+              >
+                <CloseIcon />
+              </button>
+            )}
             <h2 className="inv__modal-title">Upload Document</h2>
 
-            {!uploadFile_ ? (
+            {uploading ? (
+              /* ─── Upload Progress Circle ─── */
+              <div className="inv__upload-progress">
+                <svg className="inv__progress-ring" viewBox="0 0 120 120">
+                  <circle
+                    className="inv__progress-ring-bg"
+                    cx="60"
+                    cy="60"
+                    r="52"
+                    fill="none"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    className="inv__progress-ring-fill"
+                    cx="60"
+                    cy="60"
+                    r="52"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 52}
+                    strokeDashoffset={
+                      2 * Math.PI * 52 * (1 - uploadProgress / 100)
+                    }
+                  />
+                </svg>
+                <span className="inv__progress-text">{uploadProgress}%</span>
+                <p className="inv__progress-label">
+                  Uploading {uploadFile_?.name}...
+                </p>
+              </div>
+            ) : !uploadFile_ ? (
               <div
                 className={`inv__dropzone ${dragActive ? "inv__dropzone--active" : ""}`}
                 onDragOver={(e) => {
@@ -881,12 +943,45 @@ const InventoryPage: React.FC = () => {
                   <strong>Click to browse</strong> or drag and drop
                 </p>
                 <p className="inv__dropzone-hint">
-                  PDF, DOCX, XLSX, JPG, PNG — up to 50 MB
+                  PDF, DOCX, XLSX, JPG, PNG — up to 10 MB
                 </p>
               </div>
             ) : (
-              <div className="inv__upload-file-name">
-                📄 {uploadFile_.name} ({formatSize(uploadFile_.size)})
+              <div
+                className={`inv__upload-file-info ${fileSizeError ? "inv__upload-file-info--error" : ""}`}
+              >
+                <div className="inv__upload-file-name">
+                  📄 {uploadFile_.name} ({formatSize(uploadFile_.size)})
+                </div>
+                {fileSizeError && (
+                  <div className="inv__upload-size-warning">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    File exceeds 10 MB limit. Please choose a smaller file.
+                  </div>
+                )}
+                <button
+                  className="inv__upload-change-btn"
+                  onClick={() => {
+                    setUploadFile_(null);
+                    setFileSizeError(false);
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  Choose different file
+                </button>
               </div>
             )}
 
@@ -896,28 +991,31 @@ const InventoryPage: React.FC = () => {
               style={{ display: "none" }}
               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
               onChange={(e) => {
-                if (e.target.files?.[0]) setUploadFile_(e.target.files[0]);
+                if (e.target.files?.[0]) selectFile(e.target.files[0]);
               }}
             />
 
-            <div className="inv__modal-actions">
-              <button
-                className="inv__btn inv__btn--secondary"
-                onClick={() => {
-                  setUploadOpen(false);
-                  setUploadFile_(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="inv__btn inv__btn--primary"
-                onClick={handleUpload}
-                style={{ opacity: uploadFile_ ? 1 : 0.5 }}
-              >
-                Upload
-              </button>
-            </div>
+            {!uploading && (
+              <div className="inv__modal-actions">
+                <button
+                  className="inv__btn inv__btn--secondary"
+                  onClick={() => {
+                    setUploadOpen(false);
+                    setUploadFile_(null);
+                    setFileSizeError(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={`inv__btn inv__btn--primary ${!uploadFile_ || fileSizeError ? "inv__btn--disabled" : ""}`}
+                  onClick={handleUpload}
+                  disabled={!uploadFile_ || fileSizeError}
+                >
+                  Upload
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -982,20 +1080,21 @@ const InventoryPage: React.FC = () => {
               ) : previewItem.mimeType === "application/pdf" && pdfBlobUrl ? (
                 <iframe src={pdfBlobUrl} title={previewItem.name} />
               ) : previewItem.mimeType?.startsWith("image/") && imageBlobUrl ? (
-                <img
-                  src={imageBlobUrl}
-                  alt={previewItem.name}
-                />
+                <img src={imageBlobUrl} alt={previewItem.name} />
               ) : previewContent ? (
                 ["xlsx", "xls"].includes(getFileExtension(previewItem.name)) ? (
                   <div
                     className="inv__preview-table-wrap"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(previewContent),
+                    }}
                   />
                 ) : (
                   <div
                     className="inv__preview-docx"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(previewContent),
+                    }}
                   />
                 )
               ) : (

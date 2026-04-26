@@ -274,7 +274,7 @@ export default function createAuthRouter(User) {
             profileComplete: true,
           },
         },
-        { new: true },
+        { returnDocument: "after" },
       ).select("-password");
 
       if (!user) {
