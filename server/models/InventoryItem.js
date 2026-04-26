@@ -22,6 +22,7 @@ const inventoryItemSchema = new mongoose.Schema(
       index: true,
     },
     storagePath: { type: String, default: "" },
+    gridfsFileId: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   { timestamps: true },
 );

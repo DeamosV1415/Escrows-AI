@@ -28,6 +28,7 @@ dotenv.config();
 const app = express();
 
 // ─── Security Hardening ───
+app.set('trust proxy', 1);
 app.disable("x-powered-by");
 
 app.use(
@@ -60,7 +61,7 @@ app.use(
           "https://hcaptcha.com",
           "https://*.hcaptcha.com",
         ],
-        frameSrc: ["'self'", "https://accounts.google.com", "https://hcaptcha.com", "https://*.hcaptcha.com"],
+        frameSrc: ["'self'", "blob:", "https://accounts.google.com", "https://hcaptcha.com", "https://*.hcaptcha.com"],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [],
       },
@@ -165,7 +166,7 @@ async function start() {
 
     app.use("/api/auth", createAuthRouter(User));
     app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact));
-    app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem));
+    app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem, clientsConn));
     // Gmail OAuth callback needs to skip auth — Google redirects the browser there (no JWT)
     const integrationsAuthMiddleware = (req, res, next) => {
       if (req.path === "/gmail/callback") return next();

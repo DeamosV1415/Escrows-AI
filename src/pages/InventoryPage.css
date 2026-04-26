@@ -534,10 +534,120 @@
   font-size: 0.85rem;
   color: var(--olive-800);
   font-weight: 500;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* File info container with size validation */
+
+.inv__upload-file-info {
+  margin-bottom: 16px;
+}
+
+.inv__upload-file-info--error .inv__upload-file-name {
+  background: #fde8e8;
+  color: #a33;
+}
+
+.inv__upload-size-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #bf360c;
+  line-height: 1.4;
+}
+
+.inv__upload-size-warning svg {
+  flex-shrink: 0;
+  color: #e65100;
+}
+
+.inv__upload-change-btn {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--olive-600);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.inv__upload-change-btn:hover {
+  color: var(--olive-800);
+}
+
+/* Disabled upload button */
+
+.inv__btn--disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ─── Upload Progress Circle ─── */
+
+.inv__upload-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.inv__progress-ring {
+  width: 120px;
+  height: 120px;
+  transform: rotate(-90deg);
+}
+
+.inv__progress-ring-bg {
+  stroke: var(--border-light);
+}
+
+.inv__progress-ring-fill {
+  stroke: var(--olive-500);
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.inv__progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% - 12px));
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--olive-700);
+}
+
+.inv__progress-label {
+  margin-top: 16px;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ─── Preview Modal ─── */

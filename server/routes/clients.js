@@ -155,7 +155,7 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
       const client = await Client.findOneAndUpdate(
         { _id: req.params.id, userId: req.userId },
         { $set: updates },
-        { new: true, runValidators: true },
+        { returnDocument: "after", runValidators: true },
       ).lean();
 
       if (!client) {

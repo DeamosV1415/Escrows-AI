@@ -1,30 +1,11 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
 import mongoose from "mongoose";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsRoot = path.join(__dirname, "..", "uploads");
-
-// Ensure uploads dir exists
-if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
-
-// Multer disk storage
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const clientDir = path.join(uploadsRoot, req.body.clientId || "misc");
-    if (!fs.existsSync(clientDir)) fs.mkdirSync(clientDir, { recursive: true });
-    cb(null, clientDir);
-  },
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${unique}${ext}`);
-  },
-});
+// ─── Multer memory storage (file stays in RAM as buffer) ───
+const storage = multer.memoryStorage();
 
 // Allowed file types for upload
 const ALLOWED_EXTENSIONS = new Set([
@@ -71,8 +52,13 @@ const upload = multer({
   },
 });
 
-export default function createInventoryRouter(InventoryItem) {
+export default function createInventoryRouter(InventoryItem, dbConnection) {
   const router = express.Router();
+
+  // ─── GridFS bucket on the same DB connection ───
+  const bucket = new mongoose.mongo.GridFSBucket(dbConnection.db, {
+    bucketName: "Inventory",
+  });
 
   // ─── GET /api/inventory ───
   // Query: clientId, parentId, search
@@ -210,6 +196,7 @@ export default function createInventoryRouter(InventoryItem) {
   });
 
   // ─── POST /api/inventory/upload ───
+  // File is held in memory (req.file.buffer), then written to GridFS
   router.post("/upload", (req, res, next) => {
     upload.single("file")(req, res, (err) => {
       if (err) {
@@ -231,6 +218,22 @@ export default function createInventoryRouter(InventoryItem) {
 
       const safeName = sanitizeFilename(file.originalname);
 
+      // ─── Write file buffer to GridFS ───
+      const gridfsFileId = await new Promise((resolve, reject) => {
+        const uploadStream = bucket.openUploadStream(safeName, {
+          contentType: file.mimetype,
+          metadata: {
+            userId: req.userId,
+            clientId,
+            originalName: file.originalname,
+          },
+        });
+
+        uploadStream.on("error", reject);
+        uploadStream.on("finish", () => resolve(uploadStream.id));
+        uploadStream.end(file.buffer);
+      });
+
       const item = new InventoryItem({
         userId: req.userId,
         clientId,
@@ -239,11 +242,11 @@ export default function createInventoryRouter(InventoryItem) {
         mimeType: file.mimetype,
         size: file.size,
         parentId: parentId || null,
-        storagePath: file.path,
+        gridfsFileId,
       });
 
       await item.save();
-      console.log(`📄 File uploaded: ${safeName}`);
+      console.log(`📄 File uploaded to GridFS: ${safeName}`);
       res.status(201).json(item.toObject());
     } catch (err) {
       console.error("Error uploading file:", err.message);
@@ -258,7 +261,7 @@ export default function createInventoryRouter(InventoryItem) {
       const item = await InventoryItem.findOneAndUpdate(
         { _id: req.params.id, userId: req.userId },
         { $set: { name: name.trim() } },
-        { new: true, runValidators: true },
+        { returnDocument: "after", runValidators: true },
       ).lean();
 
       if (!item) return res.status(404).json({ error: "Item not found." });
@@ -278,6 +281,21 @@ export default function createInventoryRouter(InventoryItem) {
       const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId });
       if (!item) return res.status(404).json({ error: "Item not found." });
 
+      // Helper: delete a file's GridFS data (and legacy disk file if present)
+      const deleteFileData = async (doc) => {
+        if (doc.gridfsFileId) {
+          try {
+            await bucket.delete(doc.gridfsFileId);
+          } catch (e) {
+            console.warn(`⚠️ GridFS delete failed for ${doc.name}:`, e.message);
+          }
+        }
+        // Legacy cleanup: remove disk file if it exists from old uploads
+        if (doc.storagePath) {
+          try { fs.unlinkSync(doc.storagePath); } catch {}
+        }
+      };
+
       if (item.type === "folder") {
         // Recursively collect all descendants
         const toDelete = [item._id];
@@ -289,11 +307,9 @@ export default function createInventoryRouter(InventoryItem) {
           for (const child of children) {
             toDelete.push(child._id);
             if (child.type === "folder") queue.push(child._id);
-            // Delete physical file
-            if (child.type === "file" && child.storagePath) {
-              try {
-                fs.unlinkSync(child.storagePath);
-              } catch {}
+            // Delete file data from GridFS / legacy disk
+            if (child.type === "file") {
+              await deleteFileData(child);
             }
           }
         }
@@ -304,11 +320,7 @@ export default function createInventoryRouter(InventoryItem) {
         );
       } else {
         // Single file
-        if (item.storagePath) {
-          try {
-            fs.unlinkSync(item.storagePath);
-          } catch {}
-        }
+        await deleteFileData(item);
         await InventoryItem.findOneAndDelete({ _id: req.params.id, userId: req.userId });
         console.log(`🗑️  File deleted: ${item.name}`);
       }
@@ -321,7 +333,7 @@ export default function createInventoryRouter(InventoryItem) {
   });
 
   // ─── GET /api/inventory/:id/download ───
-  // Stream file for preview/download
+  // Stream file from GridFS for preview/download
   router.get("/:id/download", async (req, res) => {
     try {
       const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId }).lean();
@@ -329,18 +341,47 @@ export default function createInventoryRouter(InventoryItem) {
         return res.status(404).json({ error: "File not found." });
       }
 
-      if (!item.storagePath || !fs.existsSync(item.storagePath)) {
-        return res.status(404).json({ error: "File not found on disk." });
+      // ─── Serve from GridFS ───
+      if (item.gridfsFileId) {
+        // Verify the GridFS file exists
+        const cursor = bucket.find({ _id: item.gridfsFileId });
+        const gridfsFile = await cursor.next();
+        if (!gridfsFile) {
+          return res.status(404).json({ error: "File not found in storage." });
+        }
+
+        res.setHeader("Content-Length", gridfsFile.length);
+        res.setHeader(
+          "Content-Type",
+          item.mimeType || "application/octet-stream",
+        );
+        res.setHeader("Content-Disposition", `inline; filename="${item.name}"`);
+
+        const downloadStream = bucket.openDownloadStream(item.gridfsFileId);
+        downloadStream.on("error", (err) => {
+          console.error("GridFS download error:", err.message);
+          if (!res.headersSent) {
+            res.status(500).json({ error: "Failed to download file." });
+          }
+        });
+        downloadStream.pipe(res);
+        return;
       }
 
-      const stat = fs.statSync(item.storagePath);
-      res.setHeader("Content-Length", stat.size);
-      res.setHeader(
-        "Content-Type",
-        item.mimeType || "application/octet-stream",
-      );
-      res.setHeader("Content-Disposition", `inline; filename="${item.name}"`);
-      fs.createReadStream(item.storagePath).pipe(res);
+      // ─── Legacy fallback: serve from disk (old uploads before GridFS) ───
+      if (item.storagePath && fs.existsSync(item.storagePath)) {
+        const stat = fs.statSync(item.storagePath);
+        res.setHeader("Content-Length", stat.size);
+        res.setHeader(
+          "Content-Type",
+          item.mimeType || "application/octet-stream",
+        );
+        res.setHeader("Content-Disposition", `inline; filename="${item.name}"`);
+        fs.createReadStream(item.storagePath).pipe(res);
+        return;
+      }
+
+      return res.status(404).json({ error: "File not found on disk." });
     } catch (err) {
       console.error("Error downloading file:", err.message);
       res.status(500).json({ error: "Failed to download file." });
