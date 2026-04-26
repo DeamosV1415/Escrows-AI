@@ -133,18 +133,7 @@ async function start() {
   const redacted = MONGODB_URI.replace(/:([^@]+)@/, ":****@");
   console.log(`🔗 Connecting to MongoDB: ${redacted}`);
 
-  try {
-    await mongoose.connect(MONGODB_URI, {
-      dbName: "waitlist_clients",
-      serverSelectionTimeoutMS: 15000,
-    });
-    console.log("✅ Connected to MongoDB — waitlist_clients");
-  } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
-  }
-
-  // ─── Second connection for Clients DB (Users, Clients, Inventory) ───
+  // ─── Clients DB (Users, Clients, Inventory, Messages, etc.) ───
   try {
     const clientsConn = mongoose.createConnection(MONGODB_URI, {
       dbName: "Clients",
