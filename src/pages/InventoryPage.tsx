@@ -54,15 +54,6 @@ async function createFolder(data: {
   return res.json();
 }
 
-async function uploadFile(formData: FormData) {
-  const res = await authFetch(`${API}/upload`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) throw new Error("Failed to upload file");
-  return res.json();
-}
-
 async function renameItem(id: string, name: string) {
   const res = await authFetch(`${API}/${id}`, {
     method: "PUT",
