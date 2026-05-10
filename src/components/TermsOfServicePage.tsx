@@ -1,9 +1,21 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "./LegalPage.css";
 
 const TermsOfServicePage: React.FC = () => {
   return (
     <main className="legal-page">
+      <Helmet>
+        <title>Terms of Service — Escrows AI</title>
+        <meta
+          name="description"
+          content="Read the Terms of Service governing your use of the Escrows AI platform. Understand your rights, responsibilities, and how our service operates."
+        />
+        <link rel="canonical" href="https://escrowsai.com/terms-of-service" />
+        <meta property="og:title" content="Terms of Service — Escrows AI" />
+        <meta property="og:url" content="https://escrowsai.com/terms-of-service" />
+      </Helmet>
+
       {/* ─── Hero Banner ─── */}
       <section className="legal-hero">
         <div className="legal-hero__overlay" />
