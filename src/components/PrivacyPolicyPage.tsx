@@ -1,9 +1,21 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "./LegalPage.css";
 
 const PrivacyPolicyPage: React.FC = () => {
   return (
     <main className="legal-page">
+      <Helmet>
+        <title>Privacy Policy — Escrows AI</title>
+        <meta
+          name="description"
+          content="Learn how Escrows AI collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure."
+        />
+        <link rel="canonical" href="https://escrowsai.com/privacy-policy" />
+        <meta property="og:title" content="Privacy Policy — Escrows AI" />
+        <meta property="og:url" content="https://escrowsai.com/privacy-policy" />
+      </Helmet>
+
       {/* ─── Hero Banner ─── */}
       <section className="legal-hero">
         <div className="legal-hero__overlay" />

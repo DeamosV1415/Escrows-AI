@@ -1,8 +1,23 @@
+# =============================================
+# robots.txt — EscrowsAI (https://escrowsai.com)
+# =============================================
+
 User-agent: *
-Disallow: /api/
+
+# Allow all public landing pages
+Allow: /
+Allow: /about
+Allow: /contact
+Allow: /privacy-policy
+Allow: /terms-of-service
+Allow: /cookie-policy
+
+# Disallow private / app routes
 Disallow: /dashboard/
 Disallow: /login
 Disallow: /onboarding
-Allow: /
+Disallow: /api/
+Disallow: /server/
 
-Sitemap: https://www.escrowsai.com/sitemap.xml
+# Sitemap location
+Sitemap: https://escrowsai.com/sitemap.xml

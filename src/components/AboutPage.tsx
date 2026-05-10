@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "./AboutPage.css";
 
 /* ─── Team Data ─── */
@@ -66,6 +67,20 @@ const AboutPage: React.FC = () => {
 
   return (
     <main className="about-page">
+      <Helmet>
+        <title>About Us — Escrows AI</title>
+        <meta
+          name="description"
+          content="Learn about the Escrows AI team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals."
+        />
+        <link rel="canonical" href="https://escrowsai.com/about" />
+        <meta property="og:title" content="About Us — Escrows AI" />
+        <meta property="og:description" content="Meet the team behind Escrows AI and learn how we're transforming the way real estate professionals work." />
+        <meta property="og:url" content="https://escrowsai.com/about" />
+        <meta name="twitter:title" content="About Us — Escrows AI" />
+        <meta name="twitter:description" content="Meet the team behind Escrows AI and learn how we're transforming real estate workflows." />
+      </Helmet>
+
       {/* ══════════ 1 · Hero Banner ══════════ */}
       <section className="about-hero">
         <div className="about-hero__overlay" />

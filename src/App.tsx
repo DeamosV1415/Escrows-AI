@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { AuthProvider } from "./components/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
@@ -54,6 +55,19 @@ function LandingPage() {
 
   return (
     <>
+      <Helmet>
+        <title>Escrows AI — Never Miss a Follow-Up Again</title>
+        <meta
+          name="description"
+          content="AI-powered CRM and follow-up engine for CRE brokers. Manage deals, automate outreach, and close faster with Escrows AI."
+        />
+        <link rel="canonical" href="https://escrowsai.com/" />
+        <meta property="og:title" content="Escrows AI — Never Miss a Follow-Up Again" />
+        <meta property="og:description" content="AI-powered CRM and follow-up engine for CRE brokers. Close more deals with intelligent automation." />
+        <meta property="og:url" content="https://escrowsai.com/" />
+        <meta name="twitter:title" content="Escrows AI — Never Miss a Follow-Up Again" />
+        <meta name="twitter:description" content="AI-powered CRM and follow-up engine for CRE brokers. Close more deals with intelligent automation." />
+      </Helmet>
       <ThreeBackground />
       <Navbar />
       <Routes>

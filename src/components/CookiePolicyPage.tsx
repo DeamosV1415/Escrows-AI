@@ -1,9 +1,21 @@
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "./LegalPage.css";
 
 const CookiePolicyPage: React.FC = () => {
   return (
     <main className="legal-page">
+      <Helmet>
+        <title>Cookie Policy — Escrows AI</title>
+        <meta
+          name="description"
+          content="Find out how Escrows AI uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences."
+        />
+        <link rel="canonical" href="https://escrowsai.com/cookie-policy" />
+        <meta property="og:title" content="Cookie Policy — Escrows AI" />
+        <meta property="og:url" content="https://escrowsai.com/cookie-policy" />
+      </Helmet>
+
       {/* ─── Hero Banner ─── */}
       <section className="legal-hero">
         <div className="legal-hero__overlay" />
