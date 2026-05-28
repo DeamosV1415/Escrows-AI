@@ -15,6 +15,14 @@
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Copilot page: lock to viewport height so the chat input stays pinned
+   and only the messages area scrolls. */
+.dashboard-layout--copilot .dashboard-layout__main {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .dashboard-layout--collapsed .dashboard-layout__main {
   margin-left: 72px;
 }
@@ -23,6 +31,61 @@
   flex: 1;
   padding: 28px 32px 40px;
   overflow-y: auto;
+}
+
+/* Copilot page: chat must fill the entire content area — no outer padding,
+   no scroll on the wrapper (the chat manages its own scroll). */
+.dashboard-layout--copilot .dashboard-layout__content {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Copilot header slots (left title, right actions) ─────────────── */
+
+.dashboard-header__copilot-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.dashboard-header__copilot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Scope down the title bits so they sit comfortably in the slim page header */
+.dashboard-header__copilot-title .copilot__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.dashboard-header__copilot-title .copilot__title {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+.dashboard-header__copilot-title .copilot__subtitle {
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+}
+.dashboard-header__copilot-actions .copilot__credits {
+  font-size: 0.72rem;
+  padding: 6px 10px;
+}
+.dashboard-header__copilot-actions .copilot__clear-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .dashboard-header__copilot-title .copilot__title-group { display: none; }
+  .dashboard-header__copilot-actions .copilot__credits   { display: none; }
 }
 
 /* ─── Top Header ─── */

@@ -26,6 +26,8 @@ import AboutPage from "./components/AboutPage";
 import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
 import TermsOfServicePage from "./components/TermsOfServicePage";
 import CookiePolicyPage from "./components/CookiePolicyPage";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminPage from "./pages/AdminPage";
 
 /* ─── Landing Page (public-facing site with shared layout) ─── */
 function LandingPage() {
@@ -106,6 +108,16 @@ function App() {
 
           {/* Onboarding profile form */}
           <Route path="/onboarding" element={<OnboardingPage />} />
+
+          {/* Admin Panel (standalone, email-gated) */}
+          <Route
+            path="/admin"
+            element={
+              <AdminProtectedRoute>
+                <AdminPage />
+              </AdminProtectedRoute>
+            }
+          />
 
           {/* Dashboard (protected) */}
           <Route

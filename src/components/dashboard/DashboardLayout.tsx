@@ -28,7 +28,7 @@ const DashboardLayout: React.FC = () => {
 
   const content = (
     <div
-      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""}`}
+      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""}`}
     >
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -60,9 +60,12 @@ const DashboardLayout: React.FC = () => {
             </svg>
           </button>
 
-          {/* Search bar OR Chat Dropdown */}
+          {/* Search bar OR Copilot title slot (filled by AgentChat via portal) */}
           {isCopilotPage ? (
-            <ChatDropdown />
+            <div
+              id="copilot-title-slot"
+              className="dashboard-header__copilot-title"
+            />
           ) : (
             <div className="dashboard-header__search">
               <svg
@@ -143,7 +146,15 @@ const DashboardLayout: React.FC = () => {
                   <span>Connect Apps</span>
                 </button>
               </>
-            ) : isCopilotPage ? null : (
+            ) : isCopilotPage ? (
+              <>
+                <ChatDropdown />
+                <div
+                  id="copilot-actions-slot"
+                  className="dashboard-header__copilot-actions"
+                />
+              </>
+            ) : (
               <button
                 className="dashboard-header__add-btn"
                 onClick={() => setNewLeadOpen(true)}

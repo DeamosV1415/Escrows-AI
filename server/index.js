@@ -24,8 +24,10 @@ import createMessagesRouter from "./routes/messages.js";
 import createContactsRouter from "./routes/contacts.js";
 import createDashboardRouter from "./routes/dashboard.js";
 import createAgentRouter from "./routes/agent.js";
+import createAdminRouter from "./routes/admin.js";
 import { buildAgentGraph } from "./agent/graph.js";
 import authMiddleware from "./middleware/auth.js";
+import createAdminAuth from "./middleware/adminAuth.js";
 
 dotenv.config();
 
@@ -172,6 +174,10 @@ async function start() {
     app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message, TrackedContact, Client));
     app.use("/api/contacts", authMiddleware, createContactsRouter(TrackedContact, Client));
     app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User));
+
+    // ─── Admin Panel ───
+    const adminAuth = createAdminAuth(User);
+    app.use("/api/admin", adminAuth, createAdminRouter(User, CreditAccount));
 
     // ─── AI Copilot Agent ───
     const allModels = { Client, InventoryItem, User, Connection, Message, TrackedContact, CreditAccount, AgentConversation };

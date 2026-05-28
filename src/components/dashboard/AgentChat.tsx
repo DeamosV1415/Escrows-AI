@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../AuthContext";
 import { useCopilotChat } from "./CopilotChatContext";
 import "./AgentChat.css";
@@ -49,11 +50,22 @@ type SseEvent =
   | { type: "error"; message?: string };
 
 const STARTERS = [
-  { icon: "📊", text: "Show me my dashboard summary" },
-  { icon: "🔥", text: "Who are my hot leads right now?" },
-  { icon: "📧", text: "How many unread messages do I have?" },
-  { icon: "👤", text: "List my clients sorted by budget" },
+  { icon: "✦", text: "Show me my dashboard summary" },
+  { icon: "❋", text: "Who are my hot leads right now?" },
+  { icon: "✉", text: "How many unread messages do I have?" },
+  { icon: "❖", text: "List my clients sorted by budget" },
 ];
+
+/* A small olive sprig — calmer than a generic AI "spark". */
+const Sprig = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M12 21V8" />
+    <path d="M12 14c0-3 2-5.5 5-6 0 3-2 5.5-5 6z" />
+    <path d="M12 10c0-2.5-1.7-4.6-4.2-5 0 2.5 1.7 4.6 4.2 5z" />
+    <path d="M12 17c0-1.8 1.2-3.3 3-3.7 0 1.8-1.2 3.3-3 3.7z" />
+  </svg>
+);
 
 function uid() { return `m_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; }
 
@@ -74,6 +86,14 @@ export default function AgentChat() {
   const abortRef = useRef<AbortController | null>(null);
   // Track the chatId that was used to load history to avoid re-loading
   const loadedChatRef = useRef<string | null>(null);
+
+  // Portal targets in the page header — title (left), credits + clear (right)
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null);
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTitleSlot(document.getElementById("copilot-title-slot"));
+    setActionsSlot(document.getElementById("copilot-actions-slot"));
+  }, []);
 
   // ─── Load history + credits when activeChatId changes ──────────────
   useEffect(() => {
@@ -133,6 +153,8 @@ export default function AgentChat() {
   const appendToken = (delta: string) => {
     const id = streamIdRef.current;
     if (!id) return;
+    // Once tokens start arriving, the tool has finished running — hide the loader
+    setToolRunning(false);
     setMessages((prev) => {
       const idx = prev.findIndex((m) => m.id === id);
       if (idx === -1) {
@@ -350,99 +372,192 @@ export default function AgentChat() {
     return n.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
   }, [user?.name]);
 
-  // ─── Markdown-lite renderer (bold, code, line breaks) ─────────────────
+  // ─── Enhanced Markdown renderer ────────────────────────────────────
+  const renderInline = (text: string, keyPrefix: string = "i"): React.ReactNode[] => {
+    // Process inline patterns: ***bold italic***, **bold**, *italic*, `code`, [link](url)
+    const pattern = /(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+    const parts = text.split(pattern);
+    return parts.map((seg, j) => {
+      const key = `${keyPrefix}_${j}`;
+      // Bold italic ***text***
+      if (/^\*\*\*[^*]+\*\*\*$/.test(seg)) {
+        return <strong key={key}><em>{seg.slice(3, -3)}</em></strong>;
+      }
+      // Bold **text**
+      if (/^\*\*[^*]+\*\*$/.test(seg)) {
+        return <strong key={key}>{seg.slice(2, -2)}</strong>;
+      }
+      // Italic *text*
+      if (/^\*[^*]+\*$/.test(seg)) {
+        return <em key={key}>{seg.slice(1, -1)}</em>;
+      }
+      // Inline code `text`
+      if (/^`[^`]+`$/.test(seg)) {
+        return <code key={key}>{seg.slice(1, -1)}</code>;
+      }
+      // Link [text](url)
+      const linkMatch = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        return <a key={key} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="copilot__link">{linkMatch[1]}</a>;
+      }
+      return seg ? <span key={key}>{seg}</span> : null;
+    }).filter(Boolean);
+  };
+
   const renderContent = (text: string) => {
     if (!text) return null;
-    // Split on triple backticks for code blocks
-    const parts = text.split(/```([\s\S]*?)```/g);
-    return parts.map((part, idx) => {
-      if (idx % 2 === 1) {
-        return <pre key={idx} className="copilot__code">{part}</pre>;
+
+    // Split on code blocks first (```...```)
+    const codeBlockParts = text.split(/(```[\s\S]*?```)/g);
+
+    return codeBlockParts.map((part, codeIdx) => {
+      // Code block
+      if (/^```[\s\S]*```$/.test(part)) {
+        const inner = part.slice(3, -3);
+        // Remove optional language tag from first line
+        const firstNewline = inner.indexOf("\n");
+        const content = firstNewline > -1 && /^[a-z]*$/.test(inner.slice(0, firstNewline).trim())
+          ? inner.slice(firstNewline + 1)
+          : inner;
+        return <pre key={`cb_${codeIdx}`} className="copilot__code">{content}</pre>;
       }
-      // Inline: **bold** and `code`
-      const inline = part.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((seg, j) => {
-        if (/^\*\*[^*]+\*\*$/.test(seg)) {
-          return <strong key={j}>{seg.slice(2, -2)}</strong>;
-        }
-        if (/^`[^`]+`$/.test(seg)) {
-          return <code key={j}>{seg.slice(1, -1)}</code>;
-        }
-        return <span key={j}>{seg}</span>;
-      });
-      // Line breaks
-      const lines: React.ReactNode[] = [];
-      const splitOnNewlines = (nodes: React.ReactNode[]) => {
-        let buf: React.ReactNode[] = [];
-        nodes.forEach((n) => {
-          if (typeof n === "string" || (n as { type?: string }).type === "span") {
-            const txt = typeof n === "string" ? n : (n as { props?: { children?: string } }).props?.children || "";
-            const segs = String(txt).split("\n");
-            segs.forEach((s, k) => {
-              if (k > 0) {
-                lines.push(<span key={`l${lines.length}`}>{buf}</span>);
-                lines.push(<br key={`br${lines.length}`} />);
-                buf = [];
-              }
-              if (s) buf.push(s);
-            });
-          } else {
-            buf.push(n);
-          }
-        });
-        if (buf.length) lines.push(<span key={`l${lines.length}`}>{buf}</span>);
+
+      // Normal text — process line by line
+      const lines = part.split("\n");
+      const elements: React.ReactNode[] = [];
+      let listBuffer: { type: "ul" | "ol"; items: React.ReactNode[] } | null = null;
+
+      const flushList = () => {
+        if (!listBuffer) return;
+        const Tag = listBuffer.type === "ul" ? "ul" : "ol";
+        elements.push(
+          <Tag key={`list_${codeIdx}_${elements.length}`} className={`copilot__${listBuffer.type}`}>
+            {listBuffer.items.map((item, li) => (
+              <li key={li}>{item}</li>
+            ))}
+          </Tag>
+        );
+        listBuffer = null;
       };
-      splitOnNewlines(inline);
-      return <span key={idx}>{lines}</span>;
+
+      lines.forEach((line, lineIdx) => {
+        const trimmed = line.trim();
+        const lineKey = `${codeIdx}_${lineIdx}`;
+
+        // Empty line — flush lists, add spacing
+        if (!trimmed) {
+          flushList();
+          if (elements.length > 0) {
+            elements.push(<div key={`sp_${lineKey}`} className="copilot__spacer" />);
+          }
+          return;
+        }
+
+        // Heading: # - ####
+        const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+        if (headingMatch) {
+          flushList();
+          const level = headingMatch[1].length;
+          const headingClass = `copilot__h${level}`;
+          elements.push(
+            <div key={`h_${lineKey}`} className={headingClass}>
+              {renderInline(headingMatch[2], lineKey)}
+            </div>
+          );
+          return;
+        }
+
+        // Horizontal rule: --- or ***
+        if (/^[-*]{3,}$/.test(trimmed)) {
+          flushList();
+          elements.push(<hr key={`hr_${lineKey}`} className="copilot__hr" />);
+          return;
+        }
+
+        // Unordered list: - item or * item
+        const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+        if (ulMatch) {
+          if (!listBuffer || listBuffer.type !== "ul") {
+            flushList();
+            listBuffer = { type: "ul", items: [] };
+          }
+          listBuffer.items.push(renderInline(ulMatch[1], lineKey));
+          return;
+        }
+
+        // Ordered list: 1. item
+        const olMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
+        if (olMatch) {
+          if (!listBuffer || listBuffer.type !== "ol") {
+            flushList();
+            listBuffer = { type: "ol", items: [] };
+          }
+          listBuffer.items.push(renderInline(olMatch[1], lineKey));
+          return;
+        }
+
+        // Regular paragraph text
+        flushList();
+        elements.push(
+          <span key={`p_${lineKey}`} className="copilot__line">
+            {renderInline(trimmed, lineKey)}
+          </span>
+        );
+      });
+
+      flushList();
+      return <span key={`block_${codeIdx}`}>{elements}</span>;
     });
   };
 
+  const headerTitle = (
+    <>
+      <div className="copilot__avatar" aria-hidden>
+        <Sprig size={20} />
+      </div>
+      <div className="copilot__title-group">
+        <span className="copilot__title">AI Copilot</span>
+        <span className="copilot__subtitle">
+          <span className="copilot__status-dot" />
+          {credits?.tierLabel || "Free"} plan
+        </span>
+      </div>
+    </>
+  );
+
+  const headerActions = (
+    <>
+      <div className="copilot__credits" title="Credits remaining this month">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+        <span className="copilot__credits-count">{credits?.creditsDisplay ?? "—"}</span>
+        {!credits?.unlimited && credits?.monthlyAllocation ? `/${credits.monthlyAllocation}` : ""} credits
+      </div>
+      <button className="copilot__clear-btn" onClick={clearAll} title="Clear conversation" aria-label="Clear conversation">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        </svg>
+      </button>
+    </>
+  );
+
   return (
     <div className="copilot" id="copilot-chat">
-      {/* ─── Header ─── */}
-      <header className="copilot__header">
-        <div className="copilot__header-left">
-          <div className="copilot__avatar" aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-            </svg>
-          </div>
-          <div className="copilot__title-group">
-            <span className="copilot__title">AI Copilot</span>
-            <span className="copilot__subtitle">
-              <span className="copilot__status-dot" />
-              {credits?.tierLabel || "Free"} plan
-            </span>
-          </div>
-        </div>
-        <div className="copilot__header-right">
-          <div className="copilot__credits" title="Credits remaining this month">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-            <span className="copilot__credits-count">{credits?.creditsDisplay ?? "—"}</span>
-            {!credits?.unlimited && credits?.monthlyAllocation ? `/${credits.monthlyAllocation}` : ""} credits
-          </div>
-          <button className="copilot__clear-btn" onClick={clearAll} title="Clear conversation" aria-label="Clear conversation">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-            </svg>
-          </button>
-        </div>
-      </header>
+      {titleSlot && createPortal(headerTitle, titleSlot)}
+      {actionsSlot && createPortal(headerActions, actionsSlot)}
 
       {/* ─── Messages ─── */}
       <div className="copilot__messages">
         {messages.length === 0 && !busy ? (
           <div className="copilot__welcome">
             <div className="copilot__welcome-icon" aria-hidden>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-              </svg>
+              <Sprig size={32} />
             </div>
             <h2 className="copilot__welcome-title">
-              Hi{user?.name ? `, ${user.name.split(" ")[0]}` : ""}! How can I help?
+              Good to see you{user?.name ? `, ${user.name.split(" ")[0]}` : ""}. <em>How can I help?</em>
             </h2>
             <p className="copilot__welcome-desc">
               I can manage clients, send messages, browse documents, run dashboards and more — just ask.
@@ -460,11 +575,7 @@ export default function AgentChat() {
             {messages.map((m) => (
               <div key={m.id} className={`copilot__msg copilot__msg--${m.role}`}>
                 <div className="copilot__msg-avatar">
-                  {m.role === "user" ? userInitials : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-                    </svg>
-                  )}
+                  {m.role === "user" ? userInitials : <Sprig size={16} />}
                 </div>
                 <div className="copilot__msg-body">
                   <div className="copilot__msg-bubble">
@@ -476,8 +587,15 @@ export default function AgentChat() {
             ))}
 
             {toolRunning && (
-              <div className="copilot__tool-running" role="status" aria-live="polite">
-                <span className="copilot__spinner" /> Running tool…
+              <div className="copilot__msg copilot__msg--assistant">
+                <div className="copilot__msg-avatar">
+                  <Sprig size={16} />
+                </div>
+                <div className="copilot__msg-body">
+                  <div className="copilot__tool-running" role="status" aria-live="polite">
+                    <span className="copilot__spinner" /> Running tool…
+                  </div>
+                </div>
               </div>
             )}
 
@@ -501,9 +619,7 @@ export default function AgentChat() {
             {busy && !toolRunning && messages[messages.length - 1]?.role === "user" && (
               <div className="copilot__typing">
                 <div className="copilot__msg-avatar copilot__msg--assistant">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-                  </svg>
+                  <Sprig size={16} />
                 </div>
                 <div className="copilot__typing-dots"><div /><div /><div /></div>
               </div>
@@ -554,7 +670,7 @@ export default function AgentChat() {
           )}
         </div>
         <div className="copilot__input-hint">
-          Press Enter to send · Shift+Enter for a new line · Sensitive actions always ask first
+          <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line · Sensitive actions always ask first
         </div>
       </div>
     </div>
