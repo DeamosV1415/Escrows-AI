@@ -16,6 +16,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import InventoryPage from "./pages/InventoryPage";
 import SequencesPage from "./pages/SequencesPage";
+import CopilotPage from "./pages/CopilotPage";
 import InboxPage from "./pages/InboxPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
@@ -119,6 +120,7 @@ function App() {
             <Route path="clients" element={<ClientsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sequences" element={<SequencesPage />} />
+            <Route path="copilot" element={<CopilotPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

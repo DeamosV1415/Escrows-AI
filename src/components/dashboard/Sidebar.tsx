@@ -90,6 +90,24 @@ const navItems = [
     ),
   },
   {
+    label: "AI Copilot",
+    path: "/dashboard/copilot",
+    icon: (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+      </svg>
+    ),
+  },
+  {
     label: "Inbox",
     path: "/dashboard/inbox",
     icon: (

@@ -13,6 +13,8 @@ import userSchema from "./models/User.js";
 import connectionSchema from "./models/Connection.js";
 import messageSchema from "./models/Message.js";
 import trackedContactSchema from "./models/TrackedContact.js";
+import creditAccountSchema from "./models/CreditAccount.js";
+import agentConversationSchema from "./models/AgentConversation.js";
 import createClientsRouter from "./routes/clients.js";
 import createInventoryRouter from "./routes/inventory.js";
 import createAuthRouter from "./routes/auth.js";
@@ -21,6 +23,8 @@ import createWebhooksRouter from "./routes/webhooks.js";
 import createMessagesRouter from "./routes/messages.js";
 import createContactsRouter from "./routes/contacts.js";
 import createDashboardRouter from "./routes/dashboard.js";
+import createAgentRouter from "./routes/agent.js";
+import { buildAgentGraph } from "./agent/graph.js";
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -152,6 +156,8 @@ async function start() {
     const Connection = clientsConn.model("Connection", connectionSchema, "Connections");
     const Message = clientsConn.model("Message", messageSchema, "Messages");
     const TrackedContact = clientsConn.model("TrackedContact", trackedContactSchema, "TrackedContacts");
+    const CreditAccount = clientsConn.model("CreditAccount", creditAccountSchema, "CreditAccounts");
+    const AgentConversation = clientsConn.model("AgentConversation", agentConversationSchema, "AgentConversations");
 
     app.use("/api/auth", createAuthRouter(User));
     app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact));
@@ -166,6 +172,13 @@ async function start() {
     app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message, TrackedContact, Client));
     app.use("/api/contacts", authMiddleware, createContactsRouter(TrackedContact, Client));
     app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User));
+
+    // ─── AI Copilot Agent ───
+    const allModels = { Client, InventoryItem, User, Connection, Message, TrackedContact, CreditAccount, AgentConversation };
+    // Shared GridFS bucket so agent tools can purge file blobs on cascade deletes
+    const inventoryBucket = new mongoose.mongo.GridFSBucket(clientsConn.db, { bucketName: "Inventory" });
+    const agentGraph = buildAgentGraph(allModels);
+    app.use("/api/agent", authMiddleware, createAgentRouter(agentGraph, allModels, inventoryBucket));
   } catch (err) {
     console.error("❌ Clients DB connection failed:", err.message);
     process.exit(1);
