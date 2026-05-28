@@ -4,6 +4,7 @@ import {
   AIMessage,
   ToolMessage,
 } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import {
   getBalanceInfo,
   upgradePromptText,
@@ -246,13 +247,50 @@ async function fakeStream(sse, text, delayMs = 18) {
   }
 }
 
+/**
+ * Generate a short title for a chat using the LLM (async, fire-and-forget).
+ * Called after the first agent response on a new "New Chat".
+ */
+async function generateChatTitle(AgentConversation, chatId, userMessage, assistantReply) {
+  try {
+    const llm = new ChatOpenAI({
+      model: "gpt-4.1-mini",
+      temperature: 0.4,
+      maxTokens: 30,
+      openAIApiKey: process.env.OPENAI_API_KEY,
+    });
+    const result = await llm.invoke([
+      { role: "system", content: "Generate a concise 4-6 word title for this conversation. No quotes, no punctuation at the end. Just the title." },
+      { role: "user", content: userMessage },
+      { role: "assistant", content: assistantReply.slice(0, 300) },
+      { role: "user", content: "Generate a short title for this conversation." },
+    ]);
+    const title = (result.content || "").trim().slice(0, 80) || "New Chat";
+    await AgentConversation.findByIdAndUpdate(chatId, { title });
+    console.log(`[Auto-title] Chat ${chatId}: "${title}"`);
+  } catch (err) {
+    // Fallback: use first ~50 chars of the user message
+    try {
+      const fallback = userMessage.slice(0, 50) + (userMessage.length > 50 ? "…" : "");
+      await AgentConversation.findByIdAndUpdate(chatId, { title: fallback });
+      console.log(`[Auto-title fallback] Chat ${chatId}: "${fallback}"`);
+    } catch { /* ignore */ }
+  }
+}
+
 export default function createAgentRouter(graph, models, gridfsBucket) {
   const router = express.Router();
   const { AgentConversation, CreditAccount } = models;
 
-  async function loadConversation(userId) {
-    let convo = await AgentConversation.findOne({ userId });
-    if (!convo) convo = new AgentConversation({ userId, messages: [] });
+  async function loadConversation(userId, chatId) {
+    if (!chatId) {
+      // Create a new conversation
+      const convo = new AgentConversation({ userId, messages: [] });
+      await convo.save();
+      return convo;
+    }
+    const convo = await AgentConversation.findOne({ _id: chatId, userId });
+    if (!convo) return null;
     // Sanitize on load: deduplicate, drop orphaned tool/AI messages, fix structure.
     const cleaned = sanitizeMessages(convo.messages);
     if (cleaned.length !== convo.messages.length
@@ -270,13 +308,74 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
     }
   }
 
+  // ─── GET /api/agent/chats — list all chats for user ─────────────────
+  router.get("/chats", async (req, res) => {
+    try {
+      const chats = await AgentConversation.find({ userId: req.userId })
+        .select("title updatedAt")
+        .sort({ updatedAt: -1 })
+        .lean();
+      res.json({ chats: chats.map((c) => ({ _id: c._id, title: c.title || "New Chat", updatedAt: c.updatedAt })) });
+    } catch (err) {
+      console.error("[/agent/chats] error:", err);
+      res.status(500).json({ error: "Failed to load chats." });
+    }
+  });
+
+  // ─── POST /api/agent/chats/new — create a blank chat ────────────────
+  router.post("/chats/new", async (req, res) => {
+    try {
+      const convo = new AgentConversation({ userId: req.userId, messages: [] });
+      await convo.save();
+      res.json({ _id: convo._id, title: convo.title, updatedAt: convo.updatedAt });
+    } catch (err) {
+      console.error("[/agent/chats/new] error:", err);
+      res.status(500).json({ error: "Failed to create chat." });
+    }
+  });
+
+  // ─── PATCH /api/agent/chats/:chatId — rename a chat ────────────────
+  router.patch("/chats/:chatId", async (req, res) => {
+    try {
+      const title = String(req.body?.title || "").trim().slice(0, 80);
+      if (!title) return res.status(400).json({ error: "Title is required." });
+      const convo = await AgentConversation.findOneAndUpdate(
+        { _id: req.params.chatId, userId: req.userId },
+        { title },
+        { new: true },
+      );
+      if (!convo) return res.status(404).json({ error: "Chat not found." });
+      res.json({ _id: convo._id, title: convo.title });
+    } catch (err) {
+      console.error("[/agent/chats/:chatId PATCH] error:", err);
+      res.status(500).json({ error: "Failed to rename chat." });
+    }
+  });
+
+  // ─── DELETE /api/agent/chats/:chatId — delete a specific chat ───────
+  router.delete("/chats/:chatId", async (req, res) => {
+    try {
+      const result = await AgentConversation.findOneAndDelete({ _id: req.params.chatId, userId: req.userId });
+      if (!result) return res.status(404).json({ error: "Chat not found." });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[/agent/chats/:chatId DELETE] error:", err);
+      res.status(500).json({ error: "Failed to delete chat." });
+    }
+  });
+
   // ─── POST /api/agent/chat ─────────────────────────────────────────────
   router.post("/chat", async (req, res) => {
     const userId = req.userId;
     const message = String(req.body?.message || "").trim();
+    const chatId = req.body?.chatId || null;
     if (!message) return res.status(400).json({ error: "Message is required." });
 
-    const convo = await loadConversation(userId);
+    let convo = await loadConversation(userId, chatId);
+    if (!convo) return res.status(404).json({ error: "Chat not found." });
+
+    const isFirstMessage = convo.messages.length === 0 && convo.title === "New Chat";
+
     // If a prior confirmation was abandoned, clear it before a fresh turn.
     if (convo.pendingConfirmation) {
       convo.pendingConfirmation = null;
@@ -288,7 +387,7 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
     const creditInfo = await getBalanceInfo(CreditAccount, userId);
 
     const sse = openSSE(res);
-    sse.send({ type: "start", credits: creditInfo.credits === Infinity ? null : creditInfo.credits });
+    sse.send({ type: "start", chatId: convo._id, credits: creditInfo.credits === Infinity ? null : creditInfo.credits });
 
     try {
       const history = convo.messages.map(hydrate).filter(Boolean);
@@ -330,6 +429,7 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
         await convo.save();
         sse.send({
           type: "done",
+          chatId: convo._id,
           response: text,
           creditsRemaining: creditInfo.credits === Infinity ? null : creditInfo.credits,
           pendingConfirmation: null,
@@ -348,6 +448,7 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
         const fresh = await getBalanceInfo(CreditAccount, userId);
         sse.send({
           type: "done",
+          chatId: convo._id,
           response: finalText || state.pendingConfirmation.description,
           pendingConfirmation: state.pendingConfirmation,
           creditsRemaining: fresh.credits === Infinity ? null : fresh.credits,
@@ -361,9 +462,15 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
       trimHistory(convo);
       await convo.save();
 
+      // Auto-generate title after first exchange (fire-and-forget)
+      if (isFirstMessage && finalText) {
+        generateChatTitle(AgentConversation, convo._id, message, finalText).catch(() => {});
+      }
+
       const fresh = await getBalanceInfo(CreditAccount, userId);
       sse.send({
         type: "done",
+        chatId: convo._id,
         response: finalText,
         pendingConfirmation: null,
         creditsRemaining: fresh.credits === Infinity ? null : fresh.credits,
@@ -380,8 +487,12 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
   router.post("/confirm", async (req, res) => {
     const userId = req.userId;
     const confirmed = !!req.body?.confirmed;
+    const chatId = req.body?.chatId || null;
 
-    const convo = await loadConversation(userId);
+    if (!chatId) return res.status(400).json({ error: "chatId is required." });
+    const convo = await loadConversation(userId, chatId);
+    if (!convo) return res.status(404).json({ error: "Chat not found." });
+
     const pending = convo.pendingConfirmation;
     if (!pending) return res.status(400).json({ error: "No pending confirmation." });
 
@@ -489,7 +600,9 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
 
   // ─── GET /api/agent/history ───────────────────────────────────────────
   router.get("/history", async (req, res) => {
-    const convo = await AgentConversation.findOne({ userId: req.userId }).lean();
+    const chatId = req.query.chatId;
+    if (!chatId) return res.json({ messages: [], pendingConfirmation: null });
+    const convo = await AgentConversation.findOne({ _id: chatId, userId: req.userId }).lean();
     if (!convo) return res.json({ messages: [], pendingConfirmation: null });
     const cleaned = sanitizeMessages(convo.messages || []);
     res.json({
@@ -506,10 +619,12 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
 
   // ─── DELETE /api/agent/history ────────────────────────────────────────
   router.delete("/history", async (req, res) => {
+    const chatId = req.query.chatId;
+    if (!chatId) return res.status(400).json({ error: "chatId is required." });
     await AgentConversation.findOneAndUpdate(
-      { userId: req.userId },
+      { _id: chatId, userId: req.userId },
       { $set: { messages: [], pendingConfirmation: null } },
-      { upsert: true },
+      { upsert: false },
     );
     res.json({ success: true });
   });

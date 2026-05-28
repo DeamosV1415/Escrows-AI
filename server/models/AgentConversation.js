@@ -36,13 +36,14 @@ const agentConversationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
-      index: true,
     },
+    title: { type: String, default: "New Chat" },
     messages: { type: [messageSubSchema], default: [] },
     pendingConfirmation: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );
+
+agentConversationSchema.index({ userId: 1, updatedAt: -1 });
 
 export default agentConversationSchema;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
+import { useCopilotChat } from "./CopilotChatContext";
 import "./AgentChat.css";
 
 type Role = "user" | "assistant" | "tool";
@@ -35,11 +36,12 @@ interface Credits {
 }
 
 type SseEvent =
-  | { type: "start"; credits?: number | null }
+  | { type: "start"; chatId?: string; credits?: number | null }
   | { type: "token"; delta: string }
   | { type: "tools_started" }
   | {
       type: "done";
+      chatId?: string;
       response?: string;
       pendingConfirmation?: PendingConfirmation | null;
       creditsRemaining?: number | null;
@@ -57,6 +59,8 @@ function uid() { return `m_${Date.now()}_${Math.random().toString(36).slice(2, 8
 
 export default function AgentChat() {
   const { token, user } = useAuth();
+  const { activeChatId, setActiveChatId, refreshChatList, createNewChat } = useCopilotChat();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,34 +72,49 @@ export default function AgentChat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Track the chatId that was used to load history to avoid re-loading
+  const loadedChatRef = useRef<string | null>(null);
 
-  // ─── History + credits on mount ─────────────────────────────────────
+  // ─── Load history + credits when activeChatId changes ──────────────
   useEffect(() => {
     if (!token) return;
-    fetch("/api/agent/history", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => {
-        if (Array.isArray(d?.messages)) {
-          setMessages(
-            d.messages
-              .filter((m: { role: Role; content?: string; toolCalls?: ToolCall[] | null }) =>
-                m.role === "user" || (m.role === "assistant" && (m.content || "").trim().length > 0))
-              .map((m: { role: Role; content?: string; toolName?: string; timestamp?: string }) => ({
-                id: uid(),
-                role: m.role,
-                content: m.content || "",
-                toolName: m.toolName || null,
-                timestamp: m.timestamp || new Date().toISOString(),
-              })),
-          );
-        }
-        if (d?.pendingConfirmation) setPending(d.pendingConfirmation);
-      })
-      .catch(() => {});
+
+    // Reset state for chat switch
+    setMessages([]);
+    setPending(null);
+    setToolRunning(false);
+    setBusy(false);
+    loadedChatRef.current = activeChatId;
+
+    if (activeChatId) {
+      fetch(`/api/agent/history?chatId=${activeChatId}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => {
+          // Guard against stale responses if chat switched again
+          if (loadedChatRef.current !== activeChatId) return;
+          if (Array.isArray(d?.messages)) {
+            setMessages(
+              d.messages
+                .filter((m: { role: Role; content?: string; toolCalls?: ToolCall[] | null }) =>
+                  m.role === "user" || (m.role === "assistant" && (m.content || "").trim().length > 0))
+                .map((m: { role: Role; content?: string; toolName?: string; timestamp?: string }) => ({
+                  id: uid(),
+                  role: m.role,
+                  content: m.content || "",
+                  toolName: m.toolName || null,
+                  timestamp: m.timestamp || new Date().toISOString(),
+                })),
+            );
+          }
+          if (d?.pendingConfirmation) setPending(d.pendingConfirmation);
+        })
+        .catch(() => {});
+    }
+
     refreshCredits();
     return () => abortRef.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, activeChatId]);
 
   const refreshCredits = useCallback(async () => {
     if (!token) return;
@@ -184,6 +203,13 @@ export default function AgentChat() {
     const text = (textOverride ?? input).trim();
     if (!text || busy || !token) return;
 
+    // If no active chat, create one first
+    let chatId = activeChatId;
+    if (!chatId) {
+      chatId = await createNewChat();
+      if (!chatId) return;
+    }
+
     streamIdRef.current = uid();
     setMessages((prev) => [
       ...prev,
@@ -199,13 +225,19 @@ export default function AgentChat() {
       const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, chatId }),
         signal: abortRef.current.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       await consumeSSE(res, (ev) => {
         switch (ev.type) {
+          case "start":
+            // If server created a new chat, update our active ID
+            if (ev.chatId && ev.chatId !== activeChatId) {
+              setActiveChatId(ev.chatId);
+            }
+            break;
           case "token":          appendToken(ev.delta); break;
           case "tools_started":  setToolRunning(true);  break;
           case "done":
@@ -216,6 +248,10 @@ export default function AgentChat() {
             if (ev.creditsRemaining != null && credits) {
               setCredits({ ...credits, credits: ev.creditsRemaining, creditsDisplay: String(ev.creditsRemaining) });
             }
+            // Refresh chat list to pick up auto-generated title
+            refreshChatList();
+            // Delayed re-fetch to catch async AI title generation
+            setTimeout(() => refreshChatList(), 3000);
             break;
           case "error":
             finalizeAssistant(ev.message || "Something went wrong.");
@@ -236,7 +272,7 @@ export default function AgentChat() {
 
   // ─── Confirm / cancel a pending sensitive action ─────────────────────
   const respondToConfirm = async (confirmed: boolean) => {
-    if (!pending || busy || !token) return;
+    if (!pending || busy || !token || !activeChatId) return;
     streamIdRef.current = uid();
     setBusy(true);
     setToolRunning(false);
@@ -249,7 +285,7 @@ export default function AgentChat() {
       const res = await fetch("/api/agent/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ confirmed }),
+        body: JSON.stringify({ confirmed, chatId: activeChatId }),
         signal: abortRef.current.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -283,8 +319,8 @@ export default function AgentChat() {
   };
 
   const clearAll = async () => {
-    if (!token) return;
-    await fetch("/api/agent/history", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (!token || !activeChatId) return;
+    await fetch(`/api/agent/history?chatId=${activeChatId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     setMessages([]);
     setPending(null);
   };

@@ -1,0 +1,331 @@
+/* ─── Chat Dropdown (Copilot header) ──────────────────────────────── */
+.chat-dropdown {
+  border: 1px solid #1d2128;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  background-color: #11141b;
+  position: relative;
+  inset-inline: auto;
+  max-width: 380px;
+  min-width: 320px;
+  flex: 1;
+}
+
+.chat-dropdown input.chat-dropdown__state:where(:checked) ~ .chat-dropdown__list {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: auto;
+  visibility: visible;
+}
+.chat-dropdown input.chat-dropdown__state:where(:not(:checked)) ~ .chat-dropdown__list {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  pointer-events: none;
+  visibility: hidden;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Trigger */
+.chat-dropdown__trigger {
+  cursor: pointer;
+  list-style: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  font-weight: 500;
+  color: #e6e9ee;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-flow: row;
+  gap: 10px;
+  padding: 10px 14px;
+  height: max-content;
+  position: relative;
+  z-index: 99;
+  border-radius: inherit;
+  background-color: #11141b;
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif);
+  font-size: 0.88rem;
+  transition: background 0.15s;
+}
+.chat-dropdown__trigger:hover {
+  background-color: #161a23;
+}
+
+.chat-dropdown__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.chat-dropdown input.chat-dropdown__state:where(:checked) + .chat-dropdown__trigger {
+  background-color: #161a23;
+}
+.chat-dropdown input.chat-dropdown__state:where(:checked) + .chat-dropdown__trigger .chat-dropdown__chevron {
+  transform: rotate(180deg);
+}
+
+.chat-dropdown__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #7a8392;
+  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  flex-shrink: 0;
+}
+
+.chat-dropdown__trigger-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.chat-dropdown__trigger-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid #2c3142;
+  color: #7a8392;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.chat-dropdown__trigger-new:hover {
+  background: #1d2128;
+  color: #e6e9ee;
+  border-color: #344063;
+}
+
+/* List — absolute overlay with glassmorphism */
+.chat-dropdown__list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 49, 66, 0.7);
+  background: rgba(14, 17, 23, 0.82);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(93, 124, 255, 0.06);
+  overflow: hidden;
+}
+
+/* Search bar inside dropdown */
+.chat-dropdown__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #1d2128;
+  background: #0e1117;
+}
+.chat-dropdown__search-icon {
+  color: #51596a;
+  flex-shrink: 0;
+  display: flex;
+}
+.chat-dropdown__search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: #e6e9ee;
+  padding: 4px 0;
+}
+.chat-dropdown__search-input::placeholder {
+  color: #51596a;
+}
+
+/* Scrollable list */
+.chat-dropdown__items {
+  max-height: 20rem;
+  overflow: hidden auto;
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-dropdown__items::-webkit-scrollbar { width: 6px; }
+.chat-dropdown__items::-webkit-scrollbar-track { background: transparent; }
+.chat-dropdown__items::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; }
+.chat-dropdown__items:hover::-webkit-scrollbar-thumb { background: #2c3142; }
+
+/* Chat item */
+.chat-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: #c9cfd9;
+  position: relative;
+}
+.chat-dropdown__item:hover {
+  background: #161a23;
+}
+.chat-dropdown__item--active {
+  background: #1a1f2e;
+  color: #e6e9ee;
+}
+.chat-dropdown__item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(135deg, #5d7cff, #8e5dff);
+}
+
+.chat-dropdown__item-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #1d2128;
+  color: #7a8392;
+}
+.chat-dropdown__item--active .chat-dropdown__item-icon {
+  background: linear-gradient(135deg, #5d7cff22, #8e5dff22);
+  color: #8e9dff;
+}
+
+.chat-dropdown__item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-dropdown__item-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-dropdown__item-time {
+  font-size: 0.68rem;
+  color: #51596a;
+}
+
+/* Actions (visible on hover) */
+.chat-dropdown__item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.chat-dropdown__item:hover .chat-dropdown__item-actions {
+  opacity: 1;
+}
+.chat-dropdown__item-action {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: #51596a;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s;
+}
+.chat-dropdown__item-action:hover {
+  background: #1d2128;
+  color: #e6e9ee;
+}
+.chat-dropdown__item-action--delete:hover {
+  color: #ff7a7a;
+  background: #2a1c1c;
+}
+
+/* Rename inline input */
+.chat-dropdown__rename-input {
+  flex: 1;
+  background: #0e1117;
+  border: 1px solid #344063;
+  border-radius: 4px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: #e6e9ee;
+  padding: 3px 6px;
+}
+
+/* Empty state */
+.chat-dropdown__empty {
+  padding: 20px 14px;
+  text-align: center;
+  color: #51596a;
+  font-size: 0.82rem;
+}
+
+/* New chat button inside list */
+.chat-dropdown__new-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px dashed #2c3142;
+  background: transparent;
+  width: calc(100% - 12px);
+  margin: 2px 6px 4px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: #7a8392;
+  transition: all 0.15s;
+}
+.chat-dropdown__new-btn:hover {
+  background: #161a23;
+  color: #e6e9ee;
+  border-color: #344063;
+}
+
+@media (max-width: 720px) {
+  .chat-dropdown {
+    min-width: 240px;
+    max-width: 100%;
+  }
+}

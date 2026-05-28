@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { authFetch } from "../../utils/authFetch";
 import Sidebar from "./Sidebar";
 import ClientModal from "./ClientModal";
+import { CopilotChatProvider } from "./CopilotChatContext";
+import ChatDropdown from "./ChatDropdown";
 import "./DashboardLayout.css";
 
 const DashboardLayout: React.FC = () => {
@@ -10,6 +12,7 @@ const DashboardLayout: React.FC = () => {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const location = useLocation();
   const isInboxPage = location.pathname === "/dashboard/inbox";
+  const isCopilotPage = location.pathname === "/dashboard/copilot";
 
   const handleNewLead = async (data: Record<string, unknown>) => {
     const res = await authFetch("/api/clients", {
@@ -23,7 +26,7 @@ const DashboardLayout: React.FC = () => {
     window.dispatchEvent(new Event("client-updated"));
   };
 
-  return (
+  const content = (
     <div
       className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""}`}
     >
@@ -57,28 +60,32 @@ const DashboardLayout: React.FC = () => {
             </svg>
           </button>
 
-          {/* Search bar */}
-          <div className="dashboard-header__search">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search leads, contacts, deals..."
-              className="dashboard-header__search-input"
-            />
-            <kbd className="dashboard-header__search-kbd">⌘K</kbd>
-          </div>
+          {/* Search bar OR Chat Dropdown */}
+          {isCopilotPage ? (
+            <ChatDropdown />
+          ) : (
+            <div className="dashboard-header__search">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search leads, contacts, deals..."
+                className="dashboard-header__search-input"
+              />
+              <kbd className="dashboard-header__search-kbd">⌘K</kbd>
+            </div>
+          )}
 
           {/* Right side */}
           <div className="dashboard-header__actions">
@@ -136,7 +143,7 @@ const DashboardLayout: React.FC = () => {
                   <span>Connect Apps</span>
                 </button>
               </>
-            ) : (
+            ) : isCopilotPage ? null : (
               <button
                 className="dashboard-header__add-btn"
                 onClick={() => setNewLeadOpen(true)}
@@ -175,6 +182,13 @@ const DashboardLayout: React.FC = () => {
       )}
     </div>
   );
+
+  // Wrap with CopilotChatProvider when on the copilot page
+  // so both the header dropdown and the chat body share state
+  if (isCopilotPage) {
+    return <CopilotChatProvider>{content}</CopilotChatProvider>;
+  }
+  return content;
 };
 
 export default DashboardLayout;
