@@ -62,6 +62,13 @@ const Navbar: React.FC = () => {
             ),
           )}
           <Link
+            to="/pricing"
+            className={`navbar-pill__link ${location.pathname === "/pricing" ? "navbar-pill__link--active" : ""}`}
+            onClick={() => setMobileOpen(false)}
+          >
+            Pricing
+          </Link>
+          <Link
             to="/about"
             className={`navbar-pill__link ${location.pathname === "/about" ? "navbar-pill__link--active" : ""}`}
             onClick={() => setMobileOpen(false)}
@@ -119,6 +126,13 @@ const Navbar: React.FC = () => {
               </Link>
             ),
           )}
+          <Link
+            to="/pricing"
+            className="header__mobile-link"
+            onClick={() => setMobileOpen(false)}
+          >
+            Pricing
+          </Link>
           <Link
             to="/about"
             className="header__mobile-link"
