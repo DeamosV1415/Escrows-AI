@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import DOMPurify from "dompurify";
 import "./InventoryPage.css";
 import { authFetch } from "../utils/authFetch";
@@ -283,6 +284,7 @@ const InventoryPage: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const location = useLocation();
 
   // Navigation — breadcrumb trail
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -368,6 +370,23 @@ const InventoryPage: React.FC = () => {
     const timer = setTimeout(loadItems, 250);
     return () => clearTimeout(timer);
   }, [loadItems]);
+
+  // Read navigation state from ClientDetailModal (search or folderId)
+  useEffect(() => {
+    const state = location.state as { search?: string; folderId?: string; clientId?: string } | null;
+    if (!state) return;
+    if (state.search) {
+      setSearch(state.search);
+      setCurrentFolderId(null);
+    } else if (state.folderId) {
+      setCurrentFolderId(state.folderId);
+      if (state.clientId) setActiveClientId(state.clientId);
+      setSearch("");
+    }
+    // Clear the state so refreshing doesn't re-apply
+    window.history.replaceState({}, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   /* ─── Breadcrumbs ─── */
   const loadBreadcrumbs = useCallback(async () => {

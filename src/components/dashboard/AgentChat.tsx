@@ -426,6 +426,7 @@ export default function AgentChat() {
       const lines = part.split("\n");
       const elements: React.ReactNode[] = [];
       let listBuffer: { type: "ul" | "ol"; items: React.ReactNode[] } | null = null;
+      let tableBuffer: string[] | null = null;
 
       const flushList = () => {
         if (!listBuffer) return;
@@ -440,17 +441,82 @@ export default function AgentChat() {
         listBuffer = null;
       };
 
+      const flushTable = () => {
+        if (!tableBuffer || tableBuffer.length < 2) {
+          tableBuffer = null;
+          return;
+        }
+
+        const parseRow = (row: string) =>
+          row.split("|").map((c) => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length);
+
+        // Find the separator row (|---|---|)
+        const sepIdx = tableBuffer.findIndex((r) => /^\|[\s:]*-{2,}[\s:|]*/.test(r));
+        let headerRows: string[] = [];
+        let bodyRows: string[] = [];
+
+        if (sepIdx > 0) {
+          headerRows = tableBuffer.slice(0, sepIdx);
+          bodyRows = tableBuffer.slice(sepIdx + 1);
+        } else {
+          // No separator — first row is header
+          headerRows = [tableBuffer[0]];
+          bodyRows = tableBuffer.slice(1);
+        }
+
+        elements.push(
+          <div key={`tbl_${codeIdx}_${elements.length}`} className="copilot__table-wrap">
+            <table className="copilot__table">
+              {headerRows.length > 0 && (
+                <thead>
+                  {headerRows.map((hr, hi) => (
+                    <tr key={hi}>
+                      {parseRow(hr).map((cell, ci) => (
+                        <th key={ci}>{renderInline(cell, `th_${hi}_${ci}`)}</th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+              )}
+              {bodyRows.length > 0 && (
+                <tbody>
+                  {bodyRows.map((br, bi) => (
+                    <tr key={bi}>
+                      {parseRow(br).map((cell, ci) => (
+                        <td key={ci}>{renderInline(cell, `td_${bi}_${ci}`)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              )}
+            </table>
+          </div>
+        );
+        tableBuffer = null;
+      };
+
       lines.forEach((line, lineIdx) => {
         const trimmed = line.trim();
         const lineKey = `${codeIdx}_${lineIdx}`;
 
-        // Empty line — flush lists, add spacing
+        // Empty line — flush buffers, add spacing
         if (!trimmed) {
           flushList();
+          flushTable();
           if (elements.length > 0) {
             elements.push(<div key={`sp_${lineKey}`} className="copilot__spacer" />);
           }
           return;
+        }
+
+        // Table row: starts and ends with |, or starts with |
+        if (/^\|(.+\|)\s*$/.test(trimmed)) {
+          flushList();
+          if (!tableBuffer) tableBuffer = [];
+          tableBuffer.push(trimmed);
+          return;
+        } else {
+          flushTable();
         }
 
         // Heading: # - ####
@@ -471,6 +537,18 @@ export default function AgentChat() {
         if (/^[-*]{3,}$/.test(trimmed)) {
           flushList();
           elements.push(<hr key={`hr_${lineKey}`} className="copilot__hr" />);
+          return;
+        }
+
+        // Blockquote: > text
+        const bqMatch = trimmed.match(/^>\s*(.*)$/);
+        if (bqMatch) {
+          flushList();
+          elements.push(
+            <div key={`bq_${lineKey}`} className="copilot__blockquote">
+              {renderInline(bqMatch[1], lineKey)}
+            </div>
+          );
           return;
         }
 
@@ -506,6 +584,7 @@ export default function AgentChat() {
       });
 
       flushList();
+      flushTable();
       return <span key={`block_${codeIdx}`}>{elements}</span>;
     });
   };
