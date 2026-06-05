@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema(
     location: { type: String, trim: true, default: "" }, // City / State
     specialization: { type: String, trim: true, default: "" }, // e.g. Residential, Commercial, Land
     teamSize: { type: String, trim: true, default: "" }, // Solo, 2-5, 6-20, 20+
+
+    // ─── Subscription plan (drives storage limits) ───
+    // Defaults to "free"; onboarding plan-selection / billing will set this later.
+    // Mongoose applies the default on read, so existing users hydrate as "free"
+    // with no data migration needed.
+    plan: { type: String, enum: ["free", "growth", "pro"], default: "free" },
   },
   { timestamps: true, autoIndex: false },
 );

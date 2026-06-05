@@ -2,7 +2,15 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import mongoose from "mongoose";
+import {
+  uploadToR2,
+  getR2Object,
+  purgeInventoryBlob,
+  r2Configured,
+} from "../utils/r2.js";
+import { getStorageLimitBytes } from "../config/plans.js";
 
 // ─── Multer memory storage (file stays in RAM as buffer) ───
 const storage = multer.memoryStorage();
@@ -52,13 +60,32 @@ const upload = multer({
   },
 });
 
-export default function createInventoryRouter(InventoryItem, dbConnection) {
+export default function createInventoryRouter(InventoryItem, dbConnection, User) {
   const router = express.Router();
 
-  // ─── GridFS bucket on the same DB connection ───
+  // ─── Legacy GridFS bucket (download/delete fallback for pre-R2 files) ───
   const bucket = new mongoose.mongo.GridFSBucket(dbConnection.db, {
     bucketName: "Inventory",
   });
+
+  // ─── Storage accounting helpers ───
+  // Live aggregation on the indexed userId field — always correct, no counter
+  // drift. Cheap at free-tier scale; swap for a cached counter if it ever grows.
+  async function getUsedBytes(userId) {
+    const rows = await InventoryItem.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId), type: "file" } },
+      { $group: { _id: null, total: { $sum: "$size" } } },
+    ]);
+    return rows.length ? rows[0].total : 0;
+  }
+
+  // Reads the user's plan; defaults to "free" so storage logic never breaks
+  // before onboarding plan-selection is wired up.
+  async function getUserPlan(userId) {
+    if (!User) return "free";
+    const u = await User.findById(userId).select("plan").lean();
+    return u?.plan || "free";
+  }
 
   // ─── GET /api/inventory ───
   // Query: clientId, parentId, search
@@ -129,6 +156,22 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
     } catch (err) {
       console.error("Error fetching counts:", err.message);
       res.status(500).json({ error: "Failed to fetch counts." });
+    }
+  });
+
+  // ─── GET /api/inventory/usage ───
+  // Storage usage for the current user's plan (drives the storage bar).
+  // Declared before /:id so "usage" isn't captured as an item id.
+  router.get("/usage", async (req, res) => {
+    try {
+      const [usedBytes, plan] = await Promise.all([
+        getUsedBytes(req.userId),
+        getUserPlan(req.userId),
+      ]);
+      res.json({ plan, usedBytes, limitBytes: getStorageLimitBytes(plan) });
+    } catch (err) {
+      console.error("Error fetching storage usage:", err.message);
+      res.status(500).json({ error: "Failed to fetch storage usage." });
     }
   });
 
@@ -216,23 +259,34 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
           .json({ error: "clientId and file are required." });
       }
 
+      if (!r2Configured()) {
+        return res
+          .status(503)
+          .json({ error: "File storage is not configured." });
+      }
+
+      // ─── Enforce the user's plan storage limit ───
+      const [usedBytes, plan] = await Promise.all([
+        getUsedBytes(req.userId),
+        getUserPlan(req.userId),
+      ]);
+      const limitBytes = getStorageLimitBytes(plan);
+      if (usedBytes + file.size > limitBytes) {
+        return res.status(413).json({
+          error:
+            "Storage limit reached. Free up space or upgrade your plan to upload more.",
+          usedBytes,
+          limitBytes,
+        });
+      }
+
       const safeName = sanitizeFilename(file.originalname);
 
-      // ─── Write file buffer to GridFS ───
-      const gridfsFileId = await new Promise((resolve, reject) => {
-        const uploadStream = bucket.openUploadStream(safeName, {
-          contentType: file.mimetype,
-          metadata: {
-            userId: req.userId,
-            clientId,
-            originalName: file.originalname,
-          },
-        });
-
-        uploadStream.on("error", reject);
-        uploadStream.on("finish", () => resolve(uploadStream.id));
-        uploadStream.end(file.buffer);
-      });
+      // ─── Write file buffer to R2 ───
+      // Stable key based on a random UUID — survives renames and plan changes
+      // since the exact key is persisted on the doc.
+      const r2Key = `inventory/${req.userId}/${crypto.randomUUID()}-${safeName}`;
+      await uploadToR2(r2Key, file.buffer, file.mimetype);
 
       const item = new InventoryItem({
         userId: req.userId,
@@ -242,11 +296,11 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
         mimeType: file.mimetype,
         size: file.size,
         parentId: parentId || null,
-        gridfsFileId,
+        r2Key,
       });
 
       await item.save();
-      console.log(`📄 File uploaded to GridFS: ${safeName}`);
+      console.log(`📄 File uploaded to R2: ${r2Key}`);
       res.status(201).json(item.toObject());
     } catch (err) {
       console.error("Error uploading file:", err.message);
@@ -281,21 +335,6 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
       const item = await InventoryItem.findOne({ _id: req.params.id, userId: req.userId });
       if (!item) return res.status(404).json({ error: "Item not found." });
 
-      // Helper: delete a file's GridFS data (and legacy disk file if present)
-      const deleteFileData = async (doc) => {
-        if (doc.gridfsFileId) {
-          try {
-            await bucket.delete(doc.gridfsFileId);
-          } catch (e) {
-            console.warn(`⚠️ GridFS delete failed for ${doc.name}:`, e.message);
-          }
-        }
-        // Legacy cleanup: remove disk file if it exists from old uploads
-        if (doc.storagePath) {
-          try { fs.unlinkSync(doc.storagePath); } catch {}
-        }
-      };
-
       if (item.type === "folder") {
         // Recursively collect all descendants
         const toDelete = [item._id];
@@ -307,9 +346,9 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
           for (const child of children) {
             toDelete.push(child._id);
             if (child.type === "folder") queue.push(child._id);
-            // Delete file data from GridFS / legacy disk
+            // Purge the underlying blob (R2 → legacy GridFS → legacy disk)
             if (child.type === "file") {
-              await deleteFileData(child);
+              await purgeInventoryBlob(child, bucket);
             }
           }
         }
@@ -320,7 +359,7 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
         );
       } else {
         // Single file
-        await deleteFileData(item);
+        await purgeInventoryBlob(item, bucket);
         await InventoryItem.findOneAndDelete({ _id: req.params.id, userId: req.userId });
         console.log(`🗑️  File deleted: ${item.name}`);
       }
@@ -341,7 +380,36 @@ export default function createInventoryRouter(InventoryItem, dbConnection) {
         return res.status(404).json({ error: "File not found." });
       }
 
-      // ─── Serve from GridFS ───
+      // ─── Serve from R2 (current storage) ───
+      if (item.r2Key) {
+        try {
+          const obj = await getR2Object(item.r2Key);
+          if (obj.contentLength != null) {
+            res.setHeader("Content-Length", obj.contentLength);
+          }
+          res.setHeader(
+            "Content-Type",
+            item.mimeType || obj.contentType || "application/octet-stream",
+          );
+          res.setHeader("Content-Disposition", `inline; filename="${item.name}"`);
+          // Cache repeat previews in the browser → avoids re-billing Class B ops
+          res.setHeader("Cache-Control", "private, max-age=3600");
+
+          obj.body.on("error", (err) => {
+            console.error("R2 stream error:", err.message);
+            if (!res.headersSent) {
+              res.status(500).json({ error: "Failed to download file." });
+            }
+          });
+          obj.body.pipe(res);
+          return;
+        } catch (err) {
+          console.error("R2 download error:", err.message);
+          return res.status(404).json({ error: "File not found in storage." });
+        }
+      }
+
+      // ─── Legacy fallback: serve from GridFS ───
       if (item.gridfsFileId) {
         // Verify the GridFS file exists
         const cursor = bucket.find({ _id: item.gridfsFileId });

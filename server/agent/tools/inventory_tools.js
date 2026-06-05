@@ -1,5 +1,6 @@
 import { z } from "zod";
 import mongoose from "mongoose";
+import { purgeInventoryBlob } from "../../utils/r2.js";
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -159,9 +160,7 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
       if (!item) throw new Error("Item not found.");
 
       async function purgeFile(doc) {
-        if (gridfsBucket && doc.gridfsFileId) {
-          try { await gridfsBucket.delete(doc.gridfsFileId); } catch {}
-        }
+        await purgeInventoryBlob(doc, gridfsBucket);
       }
 
       if (item.type === "folder") {

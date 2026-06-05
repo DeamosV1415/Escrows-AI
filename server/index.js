@@ -161,9 +161,13 @@ async function start() {
     const CreditAccount = clientsConn.model("CreditAccount", creditAccountSchema, "CreditAccounts");
     const AgentConversation = clientsConn.model("AgentConversation", agentConversationSchema, "AgentConversations");
 
+    // Shared GridFS bucket (legacy file blobs) — used by inventory routes,
+    // client cascade-delete, and agent tools to purge files alongside R2.
+    const inventoryBucket = new mongoose.mongo.GridFSBucket(clientsConn.db, { bucketName: "Inventory" });
+
     app.use("/api/auth", createAuthRouter(User));
-    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact));
-    app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem, clientsConn));
+    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket));
+    app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem, clientsConn, User));
     // Gmail OAuth callback needs to skip auth — Google redirects the browser there (no JWT)
     const integrationsAuthMiddleware = (req, res, next) => {
       if (req.path === "/gmail/callback") return next();
@@ -181,8 +185,6 @@ async function start() {
 
     // ─── AI Copilot Agent ───
     const allModels = { Client, InventoryItem, User, Connection, Message, TrackedContact, CreditAccount, AgentConversation };
-    // Shared GridFS bucket so agent tools can purge file blobs on cascade deletes
-    const inventoryBucket = new mongoose.mongo.GridFSBucket(clientsConn.db, { bucketName: "Inventory" });
     const agentGraph = buildAgentGraph(allModels);
     app.use("/api/agent", authMiddleware, createAgentRouter(agentGraph, allModels, inventoryBucket));
   } catch (err) {

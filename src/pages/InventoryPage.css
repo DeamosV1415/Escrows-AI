@@ -14,7 +14,8 @@
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 24px;
-  gap: 16px;
+  gap: 16px 24px;
+  flex-wrap: wrap;
 }
 
 .inv__title {
@@ -29,6 +30,72 @@
 .inv__subtitle {
   font-size: 0.88rem;
   color: var(--text-muted);
+}
+
+/* ─── Storage Bar ─── */
+
+.inv__storage {
+  flex: 0 1 440px;
+  min-width: 260px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+}
+
+.inv__storage-track {
+  flex: 1;
+  height: 8px;
+  background: var(--border-light);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.inv__storage-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition:
+    width 0.4s ease,
+    background 0.3s ease;
+}
+
+.inv__storage-fill--ok {
+  background: linear-gradient(90deg, var(--olive-500), var(--olive-600));
+}
+
+.inv__storage-fill--warn {
+  background: linear-gradient(90deg, #e0a93b, #d9892f);
+}
+
+.inv__storage-fill--danger {
+  background: linear-gradient(90deg, #e0683b, #d23f3f);
+}
+
+.inv__storage-label {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─── Upload error ─── */
+
+.inv__upload-error {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(210, 63, 63, 0.08);
+  border: 1px solid rgba(210, 63, 63, 0.25);
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: center;
 }
 
 /* ─── Toolbar ─── */

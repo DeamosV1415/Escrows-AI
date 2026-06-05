@@ -1,11 +1,12 @@
 import express from "express";
+import { purgeInventoryBlob } from "../utils/r2.js";
 
 // Escape special regex characters to prevent ReDoS
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export default function createClientsRouter(Client, InventoryItem, TrackedContact) {
+export default function createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket) {
   const router = express.Router();
 
   // ─── GET /api/clients ───
@@ -202,13 +203,10 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
             clientId: client._id,
             userId: req.userId,
           }).lean();
-          // Delete physical files from disk
+          // Purge each file's blob (R2 → legacy GridFS → legacy disk)
           for (const item of items) {
-            if (item.type === "file" && item.storagePath) {
-              try {
-                const fs = await import("fs");
-                fs.unlinkSync(item.storagePath);
-              } catch {}
+            if (item.type === "file") {
+              await purgeInventoryBlob(item, inventoryBucket);
             }
           }
           const result = await InventoryItem.deleteMany({
