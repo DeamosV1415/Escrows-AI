@@ -4,7 +4,7 @@ import { createGmailClient } from "../utils/gmailClient.js";
 import { decrypt } from "../utils/encryption.js";
 import { syncGmailMessages } from "../utils/gmailSync.js";
 
-export default function createMessagesRouter(Connection, Message, TrackedContact, Client) {
+export default function createMessagesRouter(Connection, Message, TrackedContact, Client, sequenceModels = null) {
   const router = express.Router();
 
   // ─── POST /api/messages/sync ───
@@ -21,7 +21,7 @@ export default function createMessagesRouter(Connection, Message, TrackedContact
         return res.json({ success: true, newMessages: 0, message: "Gmail not connected." });
       }
 
-      const newCount = await syncGmailMessages(connection, Message, TrackedContact, Client);
+      const newCount = await syncGmailMessages(connection, Message, TrackedContact, Client, sequenceModels);
       res.json({ success: true, newMessages: newCount });
     } catch (err) {
       console.error("Sync error:", err.message);

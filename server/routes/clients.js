@@ -1,12 +1,13 @@
 import express from "express";
 import { purgeInventoryBlob } from "../utils/r2.js";
+import { enrollOnClientCreated, enrollOnStageChanged } from "../sequences/triggers.js";
 
 // Escape special regex characters to prevent ReDoS
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export default function createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket) {
+export default function createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket, sequenceModels) {
   const router = express.Router();
 
   // ─── GET /api/clients ───
@@ -142,6 +143,11 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
         }
       }
 
+      // ─── Fire sequence triggers (best-effort; never blocks the response) ───
+      if (sequenceModels) {
+        enrollOnClientCreated(sequenceModels, client).catch(() => {});
+      }
+
       res.status(201).json(client.toObject());
     } catch (err) {
       console.error("Error creating client:", err.message);
@@ -153,6 +159,17 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
   router.put("/:id", async (req, res) => {
     try {
       const updates = req.body;
+
+      // Capture prior stage so we can fire stage_changed only on a real transition.
+      let prevStage = null;
+      if (updates.stage !== undefined) {
+        const before = await Client.findOne(
+          { _id: req.params.id, userId: req.userId },
+          { stage: 1 },
+        ).lean();
+        prevStage = before?.stage ?? null;
+      }
+
       const client = await Client.findOneAndUpdate(
         { _id: req.params.id, userId: req.userId },
         { $set: updates },
@@ -161,6 +178,11 @@ export default function createClientsRouter(Client, InventoryItem, TrackedContac
 
       if (!client) {
         return res.status(404).json({ error: "Client not found." });
+      }
+
+      // ─── Fire stage_changed trigger on a genuine transition (best-effort) ───
+      if (sequenceModels && updates.stage !== undefined && prevStage !== client.stage) {
+        enrollOnStageChanged(sequenceModels, client, prevStage, client.stage).catch(() => {});
       }
 
       // ─── Sync inventory folder name if name/company changed ───

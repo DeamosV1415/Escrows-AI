@@ -18,6 +18,41 @@ interface Client {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  transaction?: {
+    status?: string;
+    contractDate?: string | null;
+    inspectionDate?: string | null;
+    appraisalDate?: string | null;
+    loanContingencyDate?: string | null;
+    closingDate?: string | null;
+  };
+}
+
+const TXN_STATUS_LABEL: Record<string, string> = {
+  none: "Not started",
+  active: "Escrow open",
+  inspection: "Inspection",
+  appraisal: "Appraisal",
+  loan: "Loan",
+  clear_to_close: "Clear to close",
+  closed: "Closed",
+};
+const TXN_DATE_LABELS: { key: string; label: string }[] = [
+  { key: "contractDate", label: "Contract" },
+  { key: "inspectionDate", label: "Inspection" },
+  { key: "appraisalDate", label: "Appraisal" },
+  { key: "loanContingencyDate", label: "Loan contingency" },
+  { key: "closingDate", label: "Closing" },
+];
+const fmtTxnDate = (v?: string | null) =>
+  v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+
+interface DocRequest {
+  _id: string;
+  docName: string;
+  status: "pending" | "received";
+  createdAt: string;
+  receivedAt?: string | null;
 }
 
 interface InventoryItem {
@@ -192,6 +227,10 @@ const ClientDetailModal: React.FC<Props> = ({
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
 
+  // Sequence-requested documents (request_documents / wait_for_document)
+  const [docRequests, setDocRequests] = useState<DocRequest[]>([]);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -218,11 +257,38 @@ const ClientDetailModal: React.FC<Props> = ({
     }
   }, [client._id, inventoryLoaded]);
 
+  const loadDocRequests = useCallback(async () => {
+    try {
+      const res = await authFetch(`/api/sequences/document-requests?clientId=${client._id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocRequests(data.requests || []);
+      }
+    } catch {
+      /* non-critical */
+    }
+  }, [client._id]);
+
   useEffect(() => {
     if (activeTab === "inventory") {
       loadInventory();
+      loadDocRequests();
     }
-  }, [activeTab, loadInventory]);
+  }, [activeTab, loadInventory, loadDocRequests]);
+
+  const markReceived = async (id: string) => {
+    setReceivingId(id);
+    try {
+      const res = await authFetch(`/api/sequences/document-requests/${id}/receive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) await loadDocRequests();
+    } finally {
+      setReceivingId(null);
+    }
+  };
 
   const handleGoToInventory = () => {
     onClose();
@@ -414,6 +480,33 @@ const ClientDetailModal: React.FC<Props> = ({
                 </div>
               )}
 
+              {/* Transaction / escrow — shown once a deal is under contract or has a status */}
+              {(client.stage === "Under Contract" ||
+                client.stage === "Closed" ||
+                (client.transaction?.status && client.transaction.status !== "none")) && (
+                <div className="detail-modal__section">
+                  <h3 className="detail-modal__section-title">
+                    Transaction
+                    <span className="detail-modal__txn-status">
+                      {TXN_STATUS_LABEL[client.transaction?.status || "none"] ||
+                        client.transaction?.status}
+                    </span>
+                  </h3>
+                  <div className="detail-modal__txn-grid">
+                    {TXN_DATE_LABELS.map((d) => (
+                      <div key={d.key} className="detail-modal__txn-item">
+                        <span className="detail-modal__txn-label">{d.label}</span>
+                        <span className="detail-modal__txn-value">
+                          {fmtTxnDate(
+                            client.transaction?.[d.key as keyof typeof client.transaction] as string | null | undefined,
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Next Action */}
               {client.nextAction && (
                 <div className="detail-modal__section">
@@ -514,6 +607,37 @@ const ClientDetailModal: React.FC<Props> = ({
 
           {activeTab === "inventory" && (
             <div className="detail-modal__inventory">
+              {/* Sequence-requested documents (Contract-to-Close etc.) */}
+              {docRequests.length > 0 && (
+                <div className="detail-modal__docreq">
+                  <div className="detail-modal__docreq-title">Requested documents</div>
+                  {docRequests.map((r) => (
+                    <div key={r._id} className="detail-modal__docreq-row">
+                      <div>
+                        <span className="detail-modal__docreq-name">{r.docName}</span>
+                        <span className={`detail-modal__docreq-status detail-modal__docreq-status--${r.status}`}>
+                          {r.status === "received" ? "Received" : "Pending"}
+                        </span>
+                      </div>
+                      {r.status === "pending" ? (
+                        <button
+                          className="detail-modal__docreq-btn"
+                          onClick={() => markReceived(r._id)}
+                          disabled={receivingId === r._id}
+                        >
+                          {receivingId === r._id ? "…" : "Mark received"}
+                        </button>
+                      ) : (
+                        <span className="detail-modal__docreq-check">✓</span>
+                      )}
+                    </div>
+                  ))}
+                  <p className="detail-modal__docreq-hint">
+                    Marking a document received advances any sequence waiting on it.
+                  </p>
+                </div>
+              )}
+
               {inventoryLoading ? (
                 <div className="detail-modal__inv-loading">
                   <div className="detail-modal__inv-spinner" />

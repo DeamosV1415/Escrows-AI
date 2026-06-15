@@ -88,6 +88,10 @@ const navItems = [
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
+    children: [
+      { label: "Sequences", path: "/dashboard/sequences", end: true },
+      { label: "Analytics", path: "/dashboard/sequences/analytics" },
+    ],
   },
   {
     label: "AI Copilot",
@@ -325,25 +329,65 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
       <nav className="sidebar__nav">
         <div className="sidebar__nav-section">
           <span className="sidebar__nav-label">{!collapsed && "MENU"}</span>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === "/dashboard"}
-              className={({ isActive }) =>
-                `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
+          {navItems.map((item) => {
+            // Grouped item (Sequences → Sequences + Analytics)
+            if ("children" in item && item.children) {
+              if (collapsed) {
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) =>
+                      `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
+                    }
+                    title={item.label}
+                  >
+                    <span className="sidebar__link-icon">{item.icon}</span>
+                  </NavLink>
+                );
               }
-              title={collapsed ? item.label : undefined}
-            >
-              <span className="sidebar__link-icon">{item.icon}</span>
-              {!collapsed && (
-                <span className="sidebar__link-label">{item.label}</span>
-              )}
-              {!collapsed && item.label === "Inbox" && unreadCount > 0 && (
-                <span className="sidebar__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
-              )}
-            </NavLink>
-          ))}
+              return (
+                <div key={item.path} className="sidebar__group">
+                  <div className="sidebar__group-header">
+                    <span className="sidebar__link-icon">{item.icon}</span>
+                    <span className="sidebar__link-label">{item.label}</span>
+                  </div>
+                  {item.children.map((c) => (
+                    <NavLink
+                      key={c.path}
+                      to={c.path}
+                      end={c.end}
+                      className={({ isActive }) =>
+                        `sidebar__sublink ${isActive ? "sidebar__sublink--active" : ""}`
+                      }
+                    >
+                      {c.label}
+                    </NavLink>
+                  ))}
+                </div>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "/dashboard"}
+                className={({ isActive }) =>
+                  `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
+                }
+                title={collapsed ? item.label : undefined}
+              >
+                <span className="sidebar__link-icon">{item.icon}</span>
+                {!collapsed && (
+                  <span className="sidebar__link-label">{item.label}</span>
+                )}
+                {!collapsed && item.label === "Inbox" && unreadCount > 0 && (
+                  <span className="sidebar__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                )}
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
 

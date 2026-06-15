@@ -16,6 +16,8 @@ import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import InventoryPage from "./pages/InventoryPage";
 import SequencesPage from "./pages/SequencesPage";
+import SequenceBuilderPage from "./pages/SequenceBuilderPage";
+import SequenceAnalyticsPage from "./pages/SequenceAnalyticsPage";
 import CopilotPage from "./pages/CopilotPage";
 import InboxPage from "./pages/InboxPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -134,6 +136,8 @@ function App() {
             <Route path="clients" element={<ClientsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sequences" element={<SequencesPage />} />
+            <Route path="sequences/analytics" element={<SequenceAnalyticsPage />} />
+            <Route path="sequences/:id/edit" element={<SequenceBuilderPage />} />
             <Route path="copilot" element={<CopilotPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />

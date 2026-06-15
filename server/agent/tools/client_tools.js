@@ -1,5 +1,6 @@
 import { z } from "zod";
 import mongoose from "mongoose";
+import { enrollOnClientCreated, enrollOnStageChanged } from "../../sequences/triggers.js";
 
 const STAGES  = ["Lead", "Engaged", "Under Contract", "Closed"];
 const INTENTS = ["hot", "warm", "cold"];
@@ -26,7 +27,8 @@ function projectClient(c) {
   };
 }
 
-export default function registerClientTools(registry, { Client, InventoryItem, TrackedContact }) {
+export default function registerClientTools(registry, models) {
+  const { Client, InventoryItem, TrackedContact } = models;
 
   registry.register({
     category: "clients",
@@ -157,6 +159,9 @@ export default function registerClientTools(registry, { Client, InventoryItem, T
         console.error("create_client → inventory folder failed:", e.message);
       }
 
+      // Fire client_created sequence triggers (best-effort; mirrors the UI route).
+      enrollOnClientCreated(models, client).catch(() => {});
+
       return { success: true, client: projectClient(client.toObject()) };
     },
   });
@@ -200,12 +205,24 @@ export default function registerClientTools(registry, { Client, InventoryItem, T
         throw new Error("No fields to update.");
       }
 
+      // Capture prior stage for the stage_changed trigger.
+      let prevStage = null;
+      if (updates.stage !== undefined) {
+        const before = await Client.findOne({ _id: clientId, userId }, { stage: 1 }).lean();
+        prevStage = before?.stage ?? null;
+      }
+
       const client = await Client.findOneAndUpdate(
         { _id: clientId, userId },
         { $set: updates },
         { returnDocument: "after", runValidators: true },
       ).lean();
       if (!client) throw new Error("Client not found.");
+
+      // Fire stage_changed trigger on a genuine transition (best-effort).
+      if (updates.stage !== undefined && prevStage !== client.stage) {
+        enrollOnStageChanged(models, client, prevStage, client.stage).catch(() => {});
+      }
 
       if (updates.name || updates.company) {
         const folderName = client.company ? `${client.name} - ${client.company}` : client.name;

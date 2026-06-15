@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { authFetch } from "../../utils/authFetch";
 import Sidebar from "./Sidebar";
@@ -13,6 +13,26 @@ const DashboardLayout: React.FC = () => {
   const location = useLocation();
   const isInboxPage = location.pathname === "/dashboard/inbox";
   const isCopilotPage = location.pathname === "/dashboard/copilot";
+
+  // Tell the backend which timezone this broker is in, so sequence quiet hours (and
+  // schedule/wait_until timing) are evaluated in their local time instead of UTC. Runs once
+  // per browser session, and only re-syncs if the detected zone changed.
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!tz) return;
+      if (sessionStorage.getItem("seqTzSynced") === tz) return;
+      authFetch("/api/sequences/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultTimezone: tz }),
+      })
+        .then((r) => { if (r.ok) sessionStorage.setItem("seqTzSynced", tz); })
+        .catch(() => {});
+    } catch {
+      /* timezone detection is best-effort */
+    }
+  }, []);
 
   const handleNewLead = async (data: Record<string, unknown>) => {
     const res = await authFetch("/api/clients", {

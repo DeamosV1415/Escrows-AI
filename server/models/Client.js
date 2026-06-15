@@ -26,6 +26,28 @@ const clientSchema = new mongoose.Schema(
       default: "medium",
     },
     notes: { type: String, default: "" },
+    // IANA timezone of the client (e.g. "America/Los_Angeles"). Used to evaluate a sequence's
+    // quiet hours in the recipient's local time when that sequence opts into quiet hours.
+    // Optional — falls back to the broker/sequence timezone when unset.
+    timezone: { type: String, default: null },
+    // When true, the sequence engine will not enroll or send to this client (unsubscribe).
+    optedOut: { type: Boolean, default: false },
+
+    // ─── Transaction / escrow tracking (Tier-2: Contract-to-Close) ───
+    // Lightweight: deadline dates + a coarse milestone status. Read live by the engine
+    // (wait_until resolves these), settable via the update_client block or the client modal.
+    transaction: {
+      status: {
+        type: String,
+        enum: ["none", "active", "inspection", "appraisal", "loan", "clear_to_close", "closed"],
+        default: "none",
+      },
+      contractDate: { type: Date, default: null },
+      inspectionDate: { type: Date, default: null },
+      appraisalDate: { type: Date, default: null },
+      loanContingencyDate: { type: Date, default: null },
+      closingDate: { type: Date, default: null },
+    },
   },
   { timestamps: true },
 );

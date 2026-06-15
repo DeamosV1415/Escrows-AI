@@ -20,9 +20,29 @@ interface Client {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  transaction?: {
+    status?: string;
+    contractDate?: string | null;
+    inspectionDate?: string | null;
+    appraisalDate?: string | null;
+    loanContingencyDate?: string | null;
+    closingDate?: string | null;
+  };
 }
 
 const STAGES = ["Lead", "Engaged", "Under Contract", "Closed"];
+
+/* Transaction milestone labels — used on cards and the detail modal. */
+const TXN_STATUS_LABEL: Record<string, string> = {
+  active: "Escrow open",
+  inspection: "Inspection",
+  appraisal: "Appraisal",
+  loan: "Loan",
+  clear_to_close: "Clear to close",
+  closed: "Closed",
+};
+const shortDate = (v?: string | null) =>
+  v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
 const STAGE_COLORS: Record<string, string> = {
   Lead: "#6b8035",
@@ -447,6 +467,21 @@ const ClientsPage: React.FC = () => {
                           {formatBudget(client.budget)}
                         </div>
                       )}
+
+                      {client.transaction?.status &&
+                        client.transaction.status !== "none" && (
+                          <div className="clients__card-txn">
+                            <span className="clients__txn-badge">
+                              {TXN_STATUS_LABEL[client.transaction.status] ||
+                                client.transaction.status}
+                            </span>
+                            {client.transaction.closingDate && (
+                              <span className="clients__txn-date">
+                                Closes {shortDate(client.transaction.closingDate)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                     </div>
                   ))
                 )}

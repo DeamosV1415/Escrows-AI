@@ -28,6 +28,18 @@ import createAdminRouter from "./routes/admin.js";
 import { buildAgentGraph } from "./agent/graph.js";
 import authMiddleware from "./middleware/auth.js";
 import createAdminAuth from "./middleware/adminAuth.js";
+import sequenceSchema from "./models/Sequence.js";
+import sequenceEnrollmentSchema from "./models/SequenceEnrollment.js";
+import sequenceEventSchema from "./models/SequenceEvent.js";
+import sequenceSettingsSchema from "./models/SequenceSettings.js";
+import notificationSchema from "./models/Notification.js";
+import documentRequestSchema from "./models/DocumentRequest.js";
+import createSequencesRouter from "./routes/sequences.js";
+import { startScheduler } from "./sequences/scheduler.js";
+import { tick as sequenceTick } from "./sequences/engine.js";
+import { startGmailAutoSync } from "./utils/gmailSync.js";
+import { addClient, removeClient } from "./utils/realtime.js";
+import jwt from "jsonwebtoken";
 
 dotenv.config();
 
@@ -161,12 +173,25 @@ async function start() {
     const CreditAccount = clientsConn.model("CreditAccount", creditAccountSchema, "CreditAccounts");
     const AgentConversation = clientsConn.model("AgentConversation", agentConversationSchema, "AgentConversations");
 
+    // ─── Sequences models (built early so triggers can fire from client routes/tools) ───
+    const Sequence = clientsConn.model("Sequence", sequenceSchema, "Sequences");
+    const SequenceEnrollment = clientsConn.model("SequenceEnrollment", sequenceEnrollmentSchema, "SequenceEnrollments");
+    const SequenceEvent = clientsConn.model("SequenceEvent", sequenceEventSchema, "SequenceEvents");
+    const SequenceSettings = clientsConn.model("SequenceSettings", sequenceSettingsSchema, "SequenceSettings");
+    const Notification = clientsConn.model("Notification", notificationSchema, "Notifications");
+    const DocumentRequest = clientsConn.model("DocumentRequest", documentRequestSchema, "DocumentRequests");
+    // The `models` bag the engine + triggers consume.
+    const sequenceModels = {
+      Sequence, SequenceEnrollment, SequenceEvent, SequenceSettings, Notification, DocumentRequest,
+      Client, Message, Connection, User, InventoryItem,
+    };
+
     // Shared GridFS bucket (legacy file blobs) — used by inventory routes,
     // client cascade-delete, and agent tools to purge files alongside R2.
     const inventoryBucket = new mongoose.mongo.GridFSBucket(clientsConn.db, { bucketName: "Inventory" });
 
     app.use("/api/auth", createAuthRouter(User));
-    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket));
+    app.use("/api/clients", authMiddleware, createClientsRouter(Client, InventoryItem, TrackedContact, inventoryBucket, sequenceModels));
     app.use("/api/inventory", authMiddleware, createInventoryRouter(InventoryItem, clientsConn, User));
     // Gmail OAuth callback needs to skip auth — Google redirects the browser there (no JWT)
     const integrationsAuthMiddleware = (req, res, next) => {
@@ -174,8 +199,43 @@ async function start() {
       return authMiddleware(req, res, next);
     };
     app.use("/api/integrations", integrationsAuthMiddleware, createIntegrationsRouter(Connection));
-    app.use("/api/webhooks", createWebhooksRouter(Connection, Message, TrackedContact, Client)); // No auth — called by Google
-    app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message, TrackedContact, Client));
+    app.use("/api/webhooks", createWebhooksRouter(Connection, Message, TrackedContact, Client, sequenceModels)); // No auth — called by Google
+
+    // ─── Real-time inbox stream (SSE) ───
+    // Registered BEFORE the authed /api/messages mount so it stays exempt from the
+    // header-based authMiddleware: EventSource can't set an Authorization header,
+    // so it authenticates with a short-lived JWT in the query string instead.
+    app.get("/api/messages/stream", (req, res) => {
+      let userId;
+      try {
+        userId = jwt.verify(req.query.token, process.env.JWT_SECRET).userId;
+      } catch {
+        return res.status(401).end();
+      }
+
+      res.set({
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no", // disable proxy buffering (nginx)
+      });
+      res.flushHeaders?.();
+      res.write("retry: 5000\n\n"); // tell the browser to reconnect after 5s if dropped
+
+      addClient(userId, res);
+
+      // Heartbeat so proxies/load balancers don't close an idle connection.
+      const ping = setInterval(() => {
+        try { res.write(": ping\n\n"); } catch { /* ignore */ }
+      }, 25000);
+
+      req.on("close", () => {
+        clearInterval(ping);
+        removeClient(userId, res);
+      });
+    });
+
+    app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message, TrackedContact, Client, sequenceModels));
     app.use("/api/contacts", authMiddleware, createContactsRouter(TrackedContact, Client));
     app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User));
 
@@ -184,9 +244,38 @@ async function start() {
     app.use("/api/admin", adminAuth, createAdminRouter(User, CreditAccount));
 
     // ─── AI Copilot Agent ───
-    const allModels = { Client, InventoryItem, User, Connection, Message, TrackedContact, CreditAccount, AgentConversation };
+    // Sequence models are included so the copilot's create/update-client tools can fire triggers.
+    const allModels = {
+      Client, InventoryItem, User, Connection, Message, TrackedContact, CreditAccount, AgentConversation,
+      ...sequenceModels,
+    };
     const agentGraph = buildAgentGraph(allModels);
     app.use("/api/agent", authMiddleware, createAgentRouter(agentGraph, allModels, inventoryBucket));
+
+    // ─── Sequences Engine (durable engine + REST API + scheduler + secret-gated /tick) ───
+    // External backup clock (cronjob.org). Secret-gated; no JWT, like webhooks. Registered
+    // BEFORE the authed router so this exact path stays exempt from JWT auth.
+    app.post("/api/sequences/tick", async (req, res) => {
+      const secret = req.get("x-sequence-secret");
+      if (!process.env.SEQUENCES_TICK_SECRET || secret !== process.env.SEQUENCES_TICK_SECRET) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      try {
+        res.json(await sequenceTick({ models: sequenceModels }));
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    app.use("/api/sequences", authMiddleware, createSequencesRouter(sequenceModels));
+
+    // Primary in-process clock.
+    startScheduler(sequenceModels);
+
+    // Periodic Gmail auto-sync — pulls new mail for every connected account every
+    // few minutes so the inbox stays current without a manual sync. The manual
+    // "Sync" button (POST /api/messages/sync) still works alongside this.
+    startGmailAutoSync({ Connection, Message, TrackedContact, Client, sequenceModels });
   } catch (err) {
     console.error("❌ Clients DB connection failed:", err.message);
     process.exit(1);

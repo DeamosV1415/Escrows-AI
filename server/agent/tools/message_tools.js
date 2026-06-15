@@ -1,8 +1,7 @@
 import { z } from "zod";
 import mongoose from "mongoose";
-import { createGmailClient } from "../../utils/gmailClient.js";
-import { decrypt } from "../../utils/encryption.js";
 import { syncGmailMessages } from "../../utils/gmailSync.js";
+import { sendEmail, sendWhatsApp } from "../../sequences/senders.js";
 
 function toObjectId(s) { return new mongoose.Types.ObjectId(s); }
 
@@ -169,41 +168,8 @@ export default function registerMessageTools(registry, { Connection, Message, Tr
       contactName: z.string().optional(),
     }),
     handler: async (a, userId) => {
-      const conn = await Connection.findOne({ userId, channel: "gmail", status: "connected" });
-      if (!conn) throw new Error("Gmail is not connected. Open Settings → Integrations to connect it.");
-
-      const { gmail } = createGmailClient(conn);
-      const subject = a.subject || "(no subject)";
-      const raw = Buffer.from(
-        [
-          `To: ${a.to}`,
-          `From: ${conn.gmailEmail}`,
-          `Subject: ${subject}`,
-          "Content-Type: text/plain; charset=utf-8",
-          "",
-          a.body,
-        ].join("\r\n"),
-      ).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-      const reqBody = { raw };
-      if (a.threadId) reqBody.threadId = a.threadId;
-      const sent = await gmail.users.messages.send({ userId: "me", requestBody: reqBody });
-
-      const stored = await Message.create({
-        userId,
-        channel: "gmail",
-        contactIdentifier: a.to,
-        contactName: a.contactName || a.to,
-        externalId: sent.data.id,
-        threadId: sent.data.threadId || a.threadId,
-        direction: "outbound",
-        body: a.body,
-        subject,
-        status: "delivered",
-        timestamp: new Date(),
-      });
-
-      return { success: true, channel: "gmail", to: a.to, subject, messageId: String(stored._id) };
+      const r = await sendEmail({ Connection, Message }, userId, a);
+      return { success: true, channel: "gmail", to: a.to, subject: r.subject, messageId: r.messageId };
     },
   });
 
@@ -221,39 +187,8 @@ export default function registerMessageTools(registry, { Connection, Message, Tr
       contactName: z.string().optional(),
     }),
     handler: async (a, userId) => {
-      const conn = await Connection.findOne({ userId, channel: "whatsapp", status: "connected" });
-      if (!conn) throw new Error("WhatsApp is not connected. Open Settings → Integrations to connect it.");
-
-      const token = decrypt(conn.waAccessToken);
-      const res = await fetch(`https://graph.facebook.com/v21.0/${conn.waPhoneNumberId}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: a.to,
-          type: "text",
-          text: { body: a.body },
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || "WhatsApp send failed");
-      }
-      const data = await res.json();
-
-      const stored = await Message.create({
-        userId,
-        channel: "whatsapp",
-        contactIdentifier: a.to,
-        contactName: a.contactName || a.to,
-        externalId: data.messages?.[0]?.id || null,
-        threadId: a.to,
-        direction: "outbound",
-        body: a.body,
-        status: "delivered",
-        timestamp: new Date(),
-      });
-      return { success: true, channel: "whatsapp", to: a.to, messageId: String(stored._id) };
+      const r = await sendWhatsApp({ Connection, Message }, userId, a);
+      return { success: true, channel: "whatsapp", to: a.to, messageId: r.messageId };
     },
   });
 

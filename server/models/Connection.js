@@ -24,6 +24,7 @@ const connectionSchema = new mongoose.Schema(
     gmailTokens: { type: String, default: null }, // encrypted JSON
     gmailWatchExpiry: { type: Date, default: null },
     gmailHistoryId: { type: String, default: null },
+    lastSyncAt: { type: Date, default: null },
 
     // ─── WhatsApp-specific (for later) ───
     waPhoneNumberId: { type: String, default: null },
