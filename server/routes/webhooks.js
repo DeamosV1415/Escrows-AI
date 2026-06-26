@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import { wakeAwaitingReply } from "../sequences/engine.js";
 import { syncGmailMessages } from "../utils/gmailSync.js";
 import { publish } from "../utils/realtime.js";
@@ -6,6 +7,41 @@ import { publish } from "../utils/realtime.js";
 // Escape special regex characters to prevent ReDoS
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Verify Meta's X-Hub-Signature-256 (HMAC-SHA256 of the raw body with the app secret).
+ * Enforced (fail closed) whenever WHATSAPP_APP_SECRET is configured; if it isn't set we
+ * warn and allow, so an existing/dev setup keeps working until the secret is added.
+ */
+function verifyMetaSignature(req) {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) {
+    console.warn("⚠️ WHATSAPP_APP_SECRET not set — inbound WhatsApp webhooks are UNVERIFIED. Set it to enforce.");
+    return true;
+  }
+  const sig = req.get("x-hub-signature-256");
+  if (!sig || !req.rawBody) return false;
+  const expected = "sha256=" + crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch {
+    return false; // length mismatch / malformed header
+  }
+}
+
+/**
+ * Verify a shared secret on the Gmail Pub/Sub push. Configure the subscription's push
+ * endpoint as .../api/webhooks/gmail?token=<GMAIL_PUBSUB_TOKEN>. Enforced when the env
+ * var is set; warns and allows otherwise so the current setup isn't broken.
+ */
+function verifyPubSubToken(req) {
+  const expected = process.env.GMAIL_PUBSUB_TOKEN;
+  if (!expected) {
+    console.warn("⚠️ GMAIL_PUBSUB_TOKEN not set — Gmail Pub/Sub webhook is UNVERIFIED. Set it to enforce.");
+    return true;
+  }
+  return req.query.token === expected;
 }
 
 /**
@@ -19,6 +55,11 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
   // Google Pub/Sub push endpoint for Gmail notifications
   router.post("/gmail", async (req, res) => {
     try {
+      // Reject spoofed callers before doing any work (when a token is configured).
+      if (!verifyPubSubToken(req)) {
+        return res.status(401).send("Unauthorized");
+      }
+
       // Acknowledge immediately (Google expects 2xx within 20s)
       res.status(200).send("OK");
 
@@ -94,6 +135,11 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
   // Incoming WhatsApp messages
   router.post("/whatsapp", async (req, res) => {
     try {
+      // Reject forged inbound messages before doing any work (when the app secret is set).
+      if (!verifyMetaSignature(req)) {
+        return res.status(401).send("Invalid signature");
+      }
+
       // Acknowledge immediately (Meta expects 200 within 20s)
       res.status(200).send("EVENT_RECEIVED");
 

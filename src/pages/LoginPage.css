@@ -137,6 +137,28 @@
   flex-shrink: 0;
 }
 
+/* ─── Google Identity button wrapper ─── */
+/* GIS renders the button in its own (cross-origin) frame, so we can't restyle its
+   internals — but we can center it and give the element box a soft pill shadow that
+   hugs the rounded button and lifts gently on hover. */
+.login-google {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.login-google iframe,
+.login-google > div {
+  border-radius: 9999px !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.login-google:hover iframe,
+.login-google:hover > div {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
 /* ─── Divider ─── */
 
 .login-divider {
