@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Build gate — blocks merges that don't compile.
+#
+# Runs `build` on every PR into main (and on pushes to main as a backstop), so a
+# broken build like an empty/blanked file from a bad merge conflict can never reach
+# main again. Turn on "Require status checks to pass" → "Build" in branch protection
+# to make this gate enforced.
+#
+# PORTABLE: drop this single file into .github/workflows/ of any Node/TS project.
+# It auto-detects npm / pnpm / yarn from the lockfile and honours an .nvmrc if present.
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+# Cancel an in-flight run if you push again to the same PR/branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: pm
+        run: |
+          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"
+          else echo "pm=npm" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Pick Node version
+        id: node
+        run: |
+          if [ -f .nvmrc ]; then echo "ver=$(cat .nvmrc | tr -d 'v \n\r')" >> "$GITHUB_OUTPUT"
+          else echo "ver=22" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.pm.outputs.pm == 'pnpm'
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.ver }}
+          cache: ${{ steps.pm.outputs.pm }}
+
+      - name: Install dependencies
+        run: |
+          case "${{ steps.pm.outputs.pm }}" in
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) yarn install --frozen-lockfile ;;
+            npm)  npm ci ;;
+          esac
+
+      - name: Build
+        run: |
+          case "${{ steps.pm.outputs.pm }}" in
+            pnpm) pnpm run build ;;
+            yarn) yarn build ;;
+            npm)  npm run build ;;
+          esac
