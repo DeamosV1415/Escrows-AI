@@ -16,20 +16,15 @@ import registerDashboardTools   from "./tools/dashboard_tools.js";
 import registerIntegrationTools from "./tools/integration_tools.js";
 import registerProfileTools     from "./tools/profile_tools.js";
 
-export function buildAgentGraph(models) {
-  // Idempotent registration — survives nodemon reloads.
-  if (registry.size() === 0) {
-    registerClientTools(registry, models);
-    registerContactTools(registry, models);
-    registerMessageTools(registry, models);
-    registerInventoryTools(registry, models);
-    registerDashboardTools(registry, models);
-    registerIntegrationTools(registry, models);
-    registerProfileTools(registry, models);
-    console.log(`🛠  Agent registry: ${registry.size()} tools loaded`);
-  }
-
-  const graph = new StateGraph(AgentState)
+/**
+ * Compile the shared agent wiring. The graph is registry-agnostic — the node
+ * functions read their tool registry + system prompt from `config.configurable`
+ * at run time (falling back to the global copilot registry). So the SAME wiring
+ * powers both the copilot and the constrained Sequences sub-agent; only the
+ * configurable passed per request differs.
+ */
+export function compileAgentGraph() {
+  return new StateGraph(AgentState)
     .addNode("router",       routerNode)
     .addNode("agent",        agentNode)
     .addNode("confirm_gate", confirmGateNode)
@@ -49,7 +44,22 @@ export function buildAgentGraph(models) {
     })
     .addEdge("tools", "agent")
     .compile();
+}
 
+export function buildAgentGraph(models) {
+  // Idempotent registration — survives nodemon reloads.
+  if (registry.size() === 0) {
+    registerClientTools(registry, models);
+    registerContactTools(registry, models);
+    registerMessageTools(registry, models);
+    registerInventoryTools(registry, models);
+    registerDashboardTools(registry, models);
+    registerIntegrationTools(registry, models);
+    registerProfileTools(registry, models);
+    console.log(`🛠  Agent registry: ${registry.size()} tools loaded`);
+  }
+
+  const graph = compileAgentGraph();
   console.log("✅ Agent graph compiled");
   return graph;
 }

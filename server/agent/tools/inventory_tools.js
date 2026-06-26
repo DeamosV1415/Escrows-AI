@@ -1,6 +1,7 @@
 import { z } from "zod";
 import mongoose from "mongoose";
 import { purgeInventoryBlob } from "../../utils/r2.js";
+import { logActivity } from "../../utils/activityLog.js";
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -98,8 +99,18 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
     description: "Create a new folder inside a client's inventory tree.",
     creditCost: 1,
     sensitive: true,
-    buildDescription: (a) =>
-      `Create folder **${a.name}** under client \`${a.clientId}\`${a.parentId ? ` (inside parent \`${a.parentId}\`)` : " (root)"}?`,
+    buildDescription: async (a, ctx) => {
+      const c = await Client.findOne({ _id: a.clientId, userId: ctx?.userId }).select("name").lean().catch(() => null);
+      const clientLabel = c ? `**${c.name}**` : `client \`${a.clientId}\``;
+      let parentLabel = "";
+      if (a.parentId) {
+        const p = await InventoryItem.findOne({ _id: a.parentId, userId: ctx?.userId }).select("name").lean().catch(() => null);
+        parentLabel = ` (inside ${p ? `**${p.name}**` : `parent \`${a.parentId}\``})`;
+      } else {
+        parentLabel = " (root)";
+      }
+      return `Create folder **${a.name}** under ${clientLabel}${parentLabel}?`;
+    },
     schema: z.object({
       clientId: z.string(),
       name:     z.string().min(1),
@@ -118,6 +129,13 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
         type: "folder",
         parentId: a.parentId || null,
       });
+      logActivity({
+        userId,
+        category: "inventory",
+        action: "created",
+        title: `Created folder ${folder.name}`,
+        meta: { itemId: folder._id, name: folder.name, clientId: a.clientId, source: "ai" },
+      });
       return { success: true, folder: projectItem(folder.toObject()) };
     },
   });
@@ -128,7 +146,11 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
     description: "Rename a file or folder.",
     creditCost: 1,
     sensitive: true,
-    buildDescription: (a) => `Rename \`${a.itemId}\` to **${a.name}**?`,
+    buildDescription: async (a, ctx) => {
+      const it = await InventoryItem.findOne({ _id: a.itemId, userId: ctx?.userId }).select("name").lean().catch(() => null);
+      const label = it ? `**${it.name}**` : `\`${a.itemId}\``;
+      return `Rename ${label} to **${a.name}**?`;
+    },
     schema: z.object({
       itemId: z.string(),
       name:   z.string().min(1),
@@ -141,6 +163,13 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
         { returnDocument: "after", runValidators: true },
       ).lean();
       if (!it) throw new Error("Item not found.");
+      logActivity({
+        userId,
+        category: "inventory",
+        action: "updated",
+        title: `Renamed ${it.type === "folder" ? "folder" : "file"} to ${it.name}`,
+        meta: { itemId: it._id, name: it.name, source: "ai" },
+      });
       return { success: true, item: projectItem(it) };
     },
   });
@@ -151,8 +180,11 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
     description: "Permanently delete a file or folder. Folders delete all their contents recursively, including the underlying GridFS blobs.",
     creditCost: 2,
     sensitive: true,
-    buildDescription: (a) =>
-      `**Permanently delete** item \`${a.itemId}\`${a.itemId ? "" : ""}. Folders cascade-delete everything inside. Proceed?`,
+    buildDescription: async (a, ctx) => {
+      const it = await InventoryItem.findOne({ _id: a.itemId, userId: ctx?.userId }).select("name type").lean().catch(() => null);
+      const label = it ? `${it.type === "folder" ? "folder" : "file"} **${it.name}**` : `item \`${a.itemId}\``;
+      return `**Permanently delete** ${label}. Folders cascade-delete everything inside. Proceed?`;
+    },
     schema: z.object({ itemId: z.string() }),
     handler: async ({ itemId }, userId, { gridfsBucket }) => {
       if (!mongoose.isValidObjectId(itemId)) throw new Error("Invalid itemId");
@@ -177,11 +209,25 @@ export default function registerInventoryTools(registry, { InventoryItem, Client
           }
         }
         await InventoryItem.deleteMany({ _id: { $in: ids } });
+        logActivity({
+          userId,
+          category: "inventory",
+          action: "deleted",
+          title: `Deleted folder ${item.name}`,
+          meta: { name: item.name, type: "folder", clientId: item.clientId, source: "ai" },
+        });
         return { success: true, type: "folder", deletedCount: ids.length, fileCount, name: item.name };
       }
 
       await purgeFile(item);
       await InventoryItem.findOneAndDelete({ _id: itemId, userId });
+      logActivity({
+        userId,
+        category: "inventory",
+        action: "deleted",
+        title: `Deleted file ${item.name}`,
+        meta: { name: item.name, type: "file", clientId: item.clientId, source: "ai" },
+      });
       return { success: true, type: "file", deletedCount: 1, name: item.name };
     },
   });

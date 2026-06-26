@@ -1059,3 +1059,98 @@
     font-size: 1.1rem;
   }
 }
+
+/* ─── View Tabs ─── */
+
+.admin__tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 9px;
+}
+
+.admin__tab {
+  padding: 5px 14px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin__tab:hover {
+  color: var(--text-secondary);
+}
+
+.admin__tab--active {
+  background: var(--bg-card);
+  color: var(--olive-800);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Audit Log ─── */
+
+.admin__audit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.admin__audit-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.admin__audit-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.admin__audit-table td {
+  vertical-align: top;
+}
+
+.admin__audit-action {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--olive-800);
+  background: var(--olive-100);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.admin__audit-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 320px;
+}
+
+.admin__audit-chip {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.admin__audit-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}

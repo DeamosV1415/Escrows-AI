@@ -8,6 +8,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { authFetch } from "../utils/authFetch";
+import { useCopilotChat } from "../components/dashboard/CopilotChatContext";
 import {
   BLOCK_META, FAMILY_COLOR, FAMILY_LABEL, handlesFor, newNodeId, MERGE_FIELDS,
   STAGES, INTENTS, PRIORITIES, TXN_STATUSES, TXN_DATE_FIELDS,
@@ -158,6 +159,7 @@ const clampW = (w: number, min: number, max: number) => Math.min(max, Math.max(m
 function Builder() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { openCopilot } = useCopilotChat();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<RFData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [seq, setSeq] = useState<Sequence | null>(null);
@@ -199,16 +201,35 @@ function Builder() {
     document.body.classList.add("sb--resizing");
   };
 
-  useEffect(() => {
-    authFetch(`/api/sequences/${id}`).then((r) => r.json()).then((s) => {
+  const loadSequence = useCallback(() => {
+    return authFetch(`/api/sequences/${id}`).then((r) => r.json()).then((s) => {
       setSeq(s);
       setName(s.name);
       const rf = toRF(s.graph);
       setNodes(rf.nodes);
       setEdges(rf.edges);
     });
-    authFetch("/api/sequences").then((r) => r.json()).then((d) => setOtherSeqs((d.sequences || []).filter((x: Sequence) => x._id !== id)));
   }, [id, setNodes, setEdges]);
+
+  useEffect(() => {
+    loadSequence();
+    authFetch("/api/sequences").then((r) => r.json()).then((d) => setOtherSeqs((d.sequences || []).filter((x: Sequence) => x._id !== id)));
+  }, [id, loadSequence]);
+
+  // When the Sequences sub-agent edits THIS sequence, reload the canvas so the broker
+  // reviews the AI's changes in place (its draft was saved server-side under the same id).
+  useEffect(() => {
+    const onGenerated = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { sequenceId?: string } | undefined;
+      if (detail?.sequenceId && detail.sequenceId === id) {
+        loadSequence();
+        setSavedMsg("Updated by AI — review and save");
+        setTimeout(() => setSavedMsg(""), 4000);
+      }
+    };
+    window.addEventListener("sequence-generated", onGenerated);
+    return () => window.removeEventListener("sequence-generated", onGenerated);
+  }, [id, loadSequence]);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -324,7 +345,7 @@ function Builder() {
         <div className="sb__top-actions">
           {savedMsg && <span className="sb__saved">{savedMsg}</span>}
           <button className="sb__btn" onClick={autoLayout}>Auto-layout</button>
-          <button className="sb__btn" onClick={() => alert("AI sequence generation ships in a later phase. For now, build on the canvas or start from a template.")}>✨ Create with AI</button>
+          <button className="sb__btn" onClick={() => openCopilot({ mode: "sequences", sequenceId: id, sequenceName: name })}>✨ Create with AI</button>
           <button className="sb__btn" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
           {seq.status === "active" ? (
             <button className="sb__btn" onClick={async () => { await authFetch(`/api/sequences/${id}/pause`, { method: "POST" }); setSeq((s) => s ? { ...s, status: "paused" } : s); }}>Pause</button>

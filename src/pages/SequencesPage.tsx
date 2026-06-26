@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { authFetch } from "../utils/authFetch";
+import { useCopilotChat } from "../components/dashboard/CopilotChatContext";
 import type { Sequence } from "../utils/sequenceMeta";
 import "./SequencesPage.css";
 
@@ -36,11 +37,14 @@ const TRIGGER_LABEL: Record<string, string> = {
 
 const SequencesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { openCopilot } = useCopilotChat();
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [templates, setTemplates] = useState<TemplateCard[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [killSwitch, setKillSwitch] = useState(false);
+  const [activeLimit, setActiveLimit] = useState<number | null>(null);
+  const [graceUntil, setGraceUntil] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -56,6 +60,8 @@ const SequencesPage: React.FC = () => {
         authFetch("/api/sequences/kill-switch").then((r) => r.json()),
       ]);
       setSequences(s.sequences || []);
+      setActiveLimit(s.usage?.activeLimit ?? null);
+      setGraceUntil(s.usage?.graceUntil ?? null);
       setTemplates(t.templates || []);
       setNotifications(n.notifications || []);
       setUnread(n.unread || 0);
@@ -69,6 +75,13 @@ const SequencesPage: React.FC = () => {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // When the Sequences sub-agent saves a draft, pull it into the list.
+  useEffect(() => {
+    const onGenerated = () => load();
+    window.addEventListener("sequence-generated", onGenerated);
+    return () => window.removeEventListener("sequence-generated", onGenerated);
   }, [load]);
 
   const useTemplate = async (key: string) => {
@@ -143,6 +156,14 @@ const SequencesPage: React.FC = () => {
   };
 
   const activeCount = sequences.filter((s) => s.status === "active").length;
+  const atCap = activeLimit != null && activeCount >= activeLimit;
+  const overBy = activeLimit != null ? Math.max(0, activeCount - activeLimit) : 0;
+  // Downgrade grace: user is over their new cap and has a deadline to pause down before
+  // the sweep auto-pauses the excess (keeping the most-recently-activated ones).
+  const graceActive = !!graceUntil && overBy > 0;
+  const graceDeadline = graceUntil
+    ? new Date(graceUntil).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "";
   const totalEnrolled = sequences.reduce((a, s) => a + (s.stats?.active || 0), 0);
   const totalCompleted = sequences.reduce((a, s) => a + (s.stats?.completed || 0), 0);
 
@@ -155,6 +176,13 @@ const SequencesPage: React.FC = () => {
           <p className="seq__subtitle">Automate client outreach with branch-capable, auto-running flows.</p>
         </div>
         <div className="seq__header-actions">
+          {/* Create with AI — opens the floating copilot in Sequences-builder mode */}
+          <button className="seq__ai-btn" onClick={() => openCopilot({ mode: "sequences" })}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            <span>Create with AI</span>
+          </button>
           {/* Notifications */}
           <div className="seq__notif-wrap">
             <button className="seq__icon-btn" onClick={() => setShowNotifs((v) => !v)} aria-label="Notifications">
@@ -211,10 +239,24 @@ const SequencesPage: React.FC = () => {
         </div>
       )}
 
+      {graceActive && (
+        <div className="seq__grace-banner">
+          ⚠️ You have <strong>{activeCount}</strong> active sequences but your plan allows{" "}
+          <strong>{activeLimit}</strong>. Pause at least <strong>{overBy}</strong> by{" "}
+          <strong>{graceDeadline}</strong>, or we'll automatically pause the extras for you
+          (keeping your most recently activated ones).
+        </div>
+      )}
+
       {/* Stats */}
       <div className="seq__stats">
         <div className="seq__stat"><div className="seq__stat-val">{sequences.length}</div><div className="seq__stat-lbl">Sequences</div></div>
-        <div className="seq__stat"><div className="seq__stat-val">{activeCount}</div><div className="seq__stat-lbl">Active</div></div>
+        <div className="seq__stat">
+          <div className={`seq__stat-val ${atCap ? "seq__stat-val--cap" : ""}`}>
+            {activeCount}{activeLimit != null && <span className="seq__stat-limit">/{activeLimit}</span>}
+          </div>
+          <div className="seq__stat-lbl">Active{atCap ? " · at limit" : ""}</div>
+        </div>
         <div className="seq__stat"><div className="seq__stat-val">{totalEnrolled}</div><div className="seq__stat-lbl">Enrolled now</div></div>
         <div className="seq__stat"><div className="seq__stat-val">{totalCompleted}</div><div className="seq__stat-lbl">Completed</div></div>
       </div>
@@ -270,7 +312,14 @@ const SequencesPage: React.FC = () => {
                 {seq.status === "active" ? (
                   <button className="seq__btn seq__btn--ghost" onClick={() => lifecycle(seq, "pause")} disabled={busy === seq._id}>Pause</button>
                 ) : (
-                  <button className="seq__btn seq__btn--ghost" onClick={() => lifecycle(seq, "activate")} disabled={busy === seq._id}>Activate</button>
+                  <button
+                    className="seq__btn seq__btn--ghost"
+                    onClick={() => lifecycle(seq, "activate")}
+                    disabled={busy === seq._id || atCap}
+                    title={atCap ? `Active limit reached (${activeLimit}). Pause one or upgrade to activate another.` : ""}
+                  >
+                    Activate
+                  </button>
                 )}
                 <button className="seq__btn seq__btn--ghost" onClick={() => setDryRunFor(seq)}>Dry-run</button>
                 <button className="seq__btn seq__btn--ghost" onClick={() => setEnrollFor(seq)} disabled={seq.status !== "active"} title={seq.status !== "active" ? "Activate first" : ""}>Enroll</button>

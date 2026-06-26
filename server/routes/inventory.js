@@ -11,6 +11,7 @@ import {
   r2Configured,
 } from "../utils/r2.js";
 import { getStorageLimitBytes } from "../config/plans.js";
+import { logActivity } from "../utils/activityLog.js";
 
 // ─── Multer memory storage (file stays in RAM as buffer) ───
 const storage = multer.memoryStorage();
@@ -301,6 +302,13 @@ export default function createInventoryRouter(InventoryItem, dbConnection, User)
 
       await item.save();
       console.log(`📄 File uploaded to R2: ${r2Key}`);
+      logActivity({
+        userId: req.userId,
+        category: "inventory",
+        action: "uploaded",
+        title: `Uploaded ${safeName}`,
+        meta: { itemId: item._id, name: safeName, clientId },
+      });
       res.status(201).json(item.toObject());
     } catch (err) {
       console.error("Error uploading file:", err.message);
@@ -363,6 +371,14 @@ export default function createInventoryRouter(InventoryItem, dbConnection, User)
         await InventoryItem.findOneAndDelete({ _id: req.params.id, userId: req.userId });
         console.log(`🗑️  File deleted: ${item.name}`);
       }
+
+      logActivity({
+        userId: req.userId,
+        category: "inventory",
+        action: "deleted",
+        title: `Deleted ${item.type === "folder" ? "folder" : "file"} ${item.name}`,
+        meta: { name: item.name, type: item.type, clientId: item.clientId },
+      });
 
       res.json({ success: true, message: "Deleted." });
     } catch (err) {

@@ -251,7 +251,7 @@ async function fakeStream(sse, text, delayMs = 18) {
  * Generate a short title for a chat using the LLM (async, fire-and-forget).
  * Called after the first agent response on a new "New Chat".
  */
-async function generateChatTitle(AgentConversation, chatId, userMessage, assistantReply) {
+async function generateChatTitle(AgentConversation, chatId, userMessage, assistantReply = "") {
   try {
     const llm = new ChatOpenAI({
       model: "gpt-4.1-mini",
@@ -259,13 +259,15 @@ async function generateChatTitle(AgentConversation, chatId, userMessage, assista
       maxTokens: 30,
       openAIApiKey: process.env.OPENAI_API_KEY,
     });
-    const result = await llm.invoke([
-      { role: "system", content: "Generate a concise 4-6 word title for this conversation. No quotes, no punctuation at the end. Just the title." },
-      { role: "user", content: userMessage },
-      { role: "assistant", content: assistantReply.slice(0, 300) },
-      { role: "user", content: "Generate a short title for this conversation." },
-    ]);
-    const title = (result.content || "").trim().slice(0, 80) || "New Chat";
+    const convo = [
+      { role: "system", content: "You name chat threads. From the user's first message, write a concise 3-6 word title that captures the topic. No quotes, no trailing punctuation, no prefixes like 'Title:'. Just the title." },
+      { role: "user", content: userMessage.slice(0, 500) },
+    ];
+    // Include the assistant's reply for extra context when we have one.
+    if (assistantReply) convo.push({ role: "assistant", content: assistantReply.slice(0, 300) });
+    convo.push({ role: "user", content: "Give a short title for this conversation." });
+    const result = await llm.invoke(convo);
+    const title = (result.content || "").trim().replace(/^["']|["']$/g, "").slice(0, 80) || "New Chat";
     await AgentConversation.findByIdAndUpdate(chatId, { title });
     console.log(`[Auto-title] Chat ${chatId}: "${title}"`);
   } catch (err) {
@@ -278,9 +280,62 @@ async function generateChatTitle(AgentConversation, chatId, userMessage, assista
   }
 }
 
-export default function createAgentRouter(graph, models, gridfsBucket) {
+/** Find a save_sequence tool result among this turn's messages → surface to the client. */
+function extractSequenceResult(messages) {
+  for (const m of messages || []) {
+    const type = m?.getType?.() || m?._getType?.() || m?.type;
+    if (type !== "tool" || m.name !== "save_sequence") continue;
+    try {
+      const parsed = JSON.parse(typeof m.content === "string" ? m.content : JSON.stringify(m.content));
+      if (parsed?.ok && parsed.sequenceId) {
+        return { sequenceId: parsed.sequenceId, applied: !!parsed.applied, builderUrl: parsed.builderUrl };
+      }
+    } catch { /* ignore non-JSON tool output */ }
+  }
+  return null;
+}
+
+/**
+ * @param graphs  Either a bare copilot graph (legacy) or { copilot, sequences } where
+ *                `sequences` is the { graph, registry, buildSystemPrompt } sub-agent bundle.
+ */
+export default function createAgentRouter(graphs, models, gridfsBucket) {
   const router = express.Router();
   const { AgentConversation, CreditAccount } = models;
+
+  // Normalize the graphs argument.
+  const copilotGraph = graphs?.copilot || graphs;
+  const sequencesAgent = graphs?.sequences || null;
+
+  /** "sequences" only when that sub-agent exists AND the client asked for it. */
+  function resolveMode(req) {
+    return req.body?.mode === "sequences" && sequencesAgent ? "sequences" : "copilot";
+  }
+
+  /** Pick the graph + build the per-request `configurable` (registry/prompt/context). */
+  async function buildRunContext(mode, userId, req, sse) {
+    const base = { models, gridfsBucket, emit: (e) => sse.send(e) };
+    if (mode === "sequences") {
+      let sequenceContext = null;
+      const sid = req.body?.sequenceId;
+      if (sid) {
+        try {
+          const seq = await models.Sequence.findOne({ _id: sid, userId }).lean();
+          if (seq) sequenceContext = { id: String(seq._id), name: seq.name, status: seq.status, graph: seq.graph };
+        } catch { /* ignore malformed id — build fresh instead */ }
+      }
+      return {
+        graph: sequencesAgent.graph,
+        configurable: {
+          ...base,
+          registry: sequencesAgent.registry,
+          buildSystemPrompt: sequencesAgent.buildSystemPrompt,
+          sequenceContext,
+        },
+      };
+    }
+    return { graph: copilotGraph, configurable: base };
+  }
 
   async function loadConversation(userId, chatId) {
     if (!chatId) {
@@ -384,15 +439,24 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
     convo.messages.push({ role: "user", content: message, timestamp: new Date() });
     await convo.save();
 
+    // Name the thread from the first message immediately (like ChatGPT/Claude),
+    // independent of whether the turn ends in text or a confirmation prompt.
+    // Fire-and-forget; the client re-fetches the chat list to pick it up.
+    if (isFirstMessage) {
+      generateChatTitle(AgentConversation, convo._id, message).catch(() => {});
+    }
+
     const creditInfo = await getBalanceInfo(CreditAccount, userId);
 
     const sse = openSSE(res);
     sse.send({ type: "start", chatId: convo._id, credits: creditInfo.credits === Infinity ? null : creditInfo.credits });
 
     try {
+      const mode = resolveMode(req);
+      const { graph: runGraph, configurable } = await buildRunContext(mode, userId, req, sse);
       const history = convo.messages.map(hydrate).filter(Boolean);
       const { state, tokensSent } = await runGraphStream({
-        graph,
+        graph: runGraph,
         input: {
           messages: history,
           userId,
@@ -403,7 +467,7 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
           pendingConfirmation: null,
           insufficientCredits: null,
         },
-        configurable: { models, gridfsBucket },
+        configurable,
         sse,
       });
 
@@ -462,17 +526,13 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
       trimHistory(convo);
       await convo.save();
 
-      // Auto-generate title after first exchange (fire-and-forget)
-      if (isFirstMessage && finalText) {
-        generateChatTitle(AgentConversation, convo._id, message, finalText).catch(() => {});
-      }
-
       const fresh = await getBalanceInfo(CreditAccount, userId);
       sse.send({
         type: "done",
         chatId: convo._id,
         response: finalText,
         pendingConfirmation: null,
+        sequenceResult: extractSequenceResult(state.messages),
         creditsRemaining: fresh.credits === Infinity ? null : fresh.credits,
       });
       sse.end();
@@ -520,20 +580,26 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
 
     try {
       const creditInfo = await getBalanceInfo(CreditAccount, userId);
+      const mode = resolveMode(req);
+      const { graph: runGraph, configurable } = await buildRunContext(mode, userId, req, sse);
       const history = convo.messages.map(hydrate).filter(Boolean);
       const { state, tokensSent } = await runGraphStream({
-        graph,
+        graph: runGraph,
         input: {
           messages: history,
           userId,
           userTier: creditInfo.tier,
           unlimited: creditInfo.unlimited,
           creditsRemaining: creditInfo.credits === Infinity ? Number.MAX_SAFE_INTEGER : creditInfo.credits,
-          approvedToolCallIds: [pending.toolCallId],
+          // Approve EVERY call in the batch at once so one click runs all of
+          // them — not one confirmation per call.
+          approvedToolCallIds: Array.isArray(pending.calls) && pending.calls.length
+            ? pending.calls.map((c) => c.toolCallId)
+            : [pending.toolCallId],
           pendingConfirmation: null,
           insufficientCredits: null,
         },
-        configurable: { models, gridfsBucket },
+        configurable,
         sse,
       });
 
@@ -588,6 +654,7 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
         type: "done",
         response: finalText,
         pendingConfirmation: null,
+        sequenceResult: extractSequenceResult(state.messages),
         creditsRemaining: fresh.credits === Infinity ? null : fresh.credits,
       });
       sse.end();
@@ -643,6 +710,34 @@ export default function createAgentRouter(graph, models, gridfsBucket) {
       totalUsed: info.totalUsed,
       lastRefill: info.lastRefill,
     });
+  });
+
+  // ─── GET /api/agent/usage — recent per-action credit breakdown ────────
+  router.get("/usage", async (req, res) => {
+    try {
+      const acct = await CreditAccount
+        .findOne({ userId: req.userId })
+        .select("history credits monthlyAllocation unlimited totalUsed lastRefill")
+        .lean();
+
+      // Newest first, capped to the most recent entries.
+      const history = (acct?.history || [])
+        .slice(-30)
+        .reverse()
+        .map((h) => ({ toolName: h.toolName, cost: h.cost, timestamp: h.timestamp }));
+
+      res.json({
+        history,
+        credits: acct?.unlimited ? null : (acct?.credits ?? 0),
+        monthlyAllocation: acct?.monthlyAllocation ?? 0,
+        unlimited: !!acct?.unlimited,
+        totalUsed: acct?.totalUsed ?? 0,
+        lastRefill: acct?.lastRefill ?? null,
+      });
+    } catch (err) {
+      console.error("[/agent/usage] error:", err);
+      res.status(500).json({ error: "Failed to load usage." });
+    }
   });
 
   return router;

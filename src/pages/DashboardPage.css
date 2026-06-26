@@ -251,6 +251,25 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 270px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+/* Slim scrollbars for the capped, scrollable panel lists. */
+.dash__leads-list::-webkit-scrollbar,
+.dash__actions-list::-webkit-scrollbar {
+  width: 6px;
+}
+.dash__leads-list::-webkit-scrollbar-thumb,
+.dash__actions-list::-webkit-scrollbar-thumb {
+  background: var(--border-color, #d8d8d0);
+  border-radius: 3px;
+}
+.dash__leads-list::-webkit-scrollbar-track,
+.dash__actions-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .dash__lead {
@@ -359,6 +378,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 270px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .dash__action {
@@ -471,10 +494,16 @@
 
 /* Pipeline */
 
+/* Flex column so the total can sit at the bottom of the (stretched) card. */
+.dash__pipeline {
+  display: flex;
+  flex-direction: column;
+}
+
 .dash__pipeline-bars {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
   margin-bottom: 16px;
 }
 
@@ -517,6 +546,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Push to the bottom so it anchors the card and fills the extra height. */
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
   font-size: 0.82rem;
@@ -707,6 +738,148 @@
   font-weight: 500;
 }
 
+/* ─── Weekly Activity (stacked column chart) ─── */
+
+/* Wave loader — bars rising/falling, themed to the dashboard palette. */
+.dash__chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+
+.loading-wave {
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.loading-bar {
+  width: 14px;
+  height: 8px;
+  margin: 0 4px;
+  border-radius: 5px;
+  background: linear-gradient(
+    180deg,
+    var(--olive-400, #8a9a4a),
+    var(--olive-600, #4d6620)
+  );
+  animation: loading-wave-animation 1s ease-in-out infinite;
+}
+
+.loading-bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.loading-bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.loading-bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+@keyframes loading-wave-animation {
+  0% {
+    height: 8px;
+  }
+  50% {
+    height: 48px;
+  }
+  100% {
+    height: 8px;
+  }
+}
+
+.dash__chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  height: 200px;
+}
+
+.dash__chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+/* Fixed-height plotting area so the bar's % height resolves reliably.
+   The 22px top room lets the count sit above the tallest bar. */
+.dash__chart-plot {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding-top: 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* The bar: height set inline (total / max). Segments stack bottom-up. */
+.dash__chart-stack {
+  position: relative;
+  width: 60%;
+  max-width: 38px;
+  min-height: 4px;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.dash__chart-seg {
+  width: 100%;
+  min-height: 3px;
+  transition: height 0.3s ease;
+}
+
+/* Round the topmost segment so the bar has a soft cap. */
+.dash__chart-stack .dash__chart-seg:last-child {
+  border-radius: 6px 6px 0 0;
+}
+
+.dash__chart-count {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.dash__chart-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.dash__chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+.dash__chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.dash__chart-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 /* ─── Recent Activity ─── */
 
 .dash__activity {
@@ -757,6 +930,24 @@
   margin-bottom: 2px;
 }
 
+/* "AI" badge — marks activity performed by the Copilot. */
+.dash__activity-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
+  color: var(--olive-800);
+  background: linear-gradient(135deg, var(--olive-100), #fff);
+  border: 1px solid var(--olive-200);
+}
+.dash__activity-ai svg { color: var(--olive-600); }
+
 .dash__activity-detail {
   font-size: 0.78rem;
   color: var(--text-muted);
@@ -768,6 +959,223 @@
   white-space: nowrap;
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* Clear button (top-right of the Recent Activity card). */
+.dash__clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.dash__clear-btn:hover {
+  background: #fdeaea;
+  border-color: #f3c9c9;
+  color: #c0392b;
+}
+
+/* ─── Confirmation dialog ─── */
+.dash__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 30, 25, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: dash-fade-in 0.15s ease;
+}
+
+.dash__modal {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  animation: dash-pop-in 0.18s ease;
+}
+
+.dash__modal-title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.dash__modal-text {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.dash__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dash__modal-btn {
+  font-size: 0.85rem;
+  font-weight: 550;
+  padding: 9px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.dash__modal-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.dash__modal-btn--ghost {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-light);
+}
+
+.dash__modal-btn--ghost:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--text-muted);
+}
+
+.dash__modal-btn--danger {
+  background: #c0392b;
+  color: #fff;
+}
+
+.dash__modal-btn--danger:hover:not(:disabled) {
+  background: #a93226;
+}
+
+@keyframes dash-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dash-pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Scrollable feed: holds the latest 15, scroll stays inside the box. */
+.dash__activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+/* In-list row tweaks: vertically centre and let the text push time to the right. */
+.dash__activity-list .dash__activity-item {
+  align-items: center;
+}
+
+.dash__activity-list .dash__activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash__activity-list .dash__activity-text {
+  margin-bottom: 0;
+}
+
+/* Per-kind icon tints (background + matching stroke colour). */
+.dash__activity-icon--client {
+  background: var(--olive-100);
+  color: var(--olive-700);
+}
+.dash__activity-icon--inbox {
+  background: #e0f0ef;
+  color: #3d7a76;
+}
+.dash__activity-icon--sequence {
+  background: #ece8f5;
+  color: #6b5ea0;
+}
+.dash__activity-icon--inventory {
+  background: #fdf0e0;
+  color: #b8860b;
+}
+
+/* Change chips for client updates (e.g. "intent  warm → hot"). */
+.dash__activity-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.dash__change-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.dash__change-field {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.dash__change-field::after {
+  content: ":";
+}
+
+.dash__change-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.dash__change-arrow {
+  color: var(--olive-600);
+  font-weight: 600;
+}
+
+.dash__activity-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+/* Slim scrollbar for the feed. */
+.dash__activity-list::-webkit-scrollbar {
+  width: 6px;
+}
+.dash__activity-list::-webkit-scrollbar-thumb {
+  background: var(--border-color, #d8d8d0);
+  border-radius: 3px;
+}
+.dash__activity-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ─── Lead Avatar (no bgColor from API, use generated) ─── */

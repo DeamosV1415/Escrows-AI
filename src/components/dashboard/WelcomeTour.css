@@ -1,0 +1,425 @@
+/* ─── Post-onboarding welcome takeover ───────────────────────────────────────
+   A full-screen, opaque luxurious moment: processing → tour prompt. Nothing else
+   is visible behind it. On choose, it fades out to reveal the dashboard. */
+
+.wtour-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.46s ease;
+}
+.wtour-screen.is-closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Opaque cream canvas with soft gold + olive light, so it reads rich, not flat. */
+.wtour-screen__bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(184, 160, 128, 0.16), transparent 60%),
+    radial-gradient(90% 70% at 85% 110%, rgba(85, 107, 47, 0.10), transparent 55%),
+    linear-gradient(180deg, #faf8f3 0%, #f3efe6 100%);
+}
+.wtour-screen__bg::after {
+  /* faint, slow drifting sheen */
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(40% 40% at 50% 50%, rgba(255, 255, 255, 0.5), transparent 70%);
+  animation: wtourDrift 14s ease-in-out infinite alternate;
+}
+@keyframes wtourDrift {
+  0%   { transform: translate(-8%, -6%) scale(1); }
+  100% { transform: translate(8%, 6%) scale(1.12); }
+}
+
+.wtour-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px;
+}
+
+/* ── Processing: breathing monogram ── */
+.wtour-stage--processing { animation: wtourFadeUp 0.6s ease both; }
+
+/* The orb: logo core + halo + two outward pulse rings + gold dust. */
+.wtour-orb {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 34px;
+}
+.wtour-orb__core {
+  position: relative;
+  z-index: 2;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #ffffff, #fbf7ee 70%);
+  box-shadow:
+    0 10px 30px -6px rgba(184, 160, 128, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(184, 160, 128, 0.22);
+  animation: wtourBreathe 3.4s ease-in-out infinite;
+}
+.wtour-orb__core img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+/* Soft gold halo glowing behind the core. */
+.wtour-orb__halo {
+  position: absolute;
+  z-index: 1;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184, 160, 128, 0.32), rgba(184, 160, 128, 0) 70%);
+  animation: wtourGlow 3.4s ease-in-out infinite;
+}
+/* Concentric rings that ripple outward and fade. */
+.wtour-orb__ring {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(184, 160, 128, 0.5);
+  animation: wtourRipple 3.4s ease-out infinite;
+}
+.wtour-orb__ring--2 { animation-delay: 1.7s; }
+@keyframes wtourRipple {
+  0%   { transform: scale(0.85); opacity: 0.55; }
+  70%  { opacity: 0; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+@keyframes wtourBreathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes wtourGlow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.12); }
+}
+
+/* Gold dust drifting up from the orb. */
+.wtour-orb__dust { position: absolute; inset: 0; z-index: 0; }
+.wtour-orb__dust i {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gold-accent, #b8a080);
+  opacity: 0;
+  /* spread the six motes across the orb and stagger their rise */
+  transform: translateX(calc((var(--i) - 2.5) * 22px));
+  animation: wtourDust 3.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.5s);
+}
+@keyframes wtourDust {
+  0%   { opacity: 0; transform: translate(calc((var(--i) - 2.5) * 22px), 0) scale(0.6); }
+  25%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(calc((var(--i) - 2.5) * 28px), -60px) scale(1); }
+}
+
+.wtour-processing__title {
+  font-family: var(--font-heading, "Cormorant Garamond", serif);
+  font-size: 2.6rem;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  margin: 0 0 10px;
+  /* slow gold shimmer sweeping across the wordmark */
+  color: var(--text-primary, #1a1a1a);
+  background: linear-gradient(
+    100deg,
+    var(--text-primary, #1a1a1a) 0%,
+    var(--text-primary, #1a1a1a) 38%,
+    var(--gold-accent, #b8a080) 50%,
+    var(--text-primary, #1a1a1a) 62%,
+    var(--text-primary, #1a1a1a) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: wtourShimmer 3.6s ease-in-out infinite;
+}
+@keyframes wtourShimmer {
+  0%   { background-position: 130% 0; }
+  100% { background-position: -30% 0; }
+}
+
+.wtour-processing__sub {
+  font-family: var(--font-body, "Inter", sans-serif);
+  font-size: 0.92rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--text-muted, #7a7a7a);
+  margin: 0 0 28px;
+  min-height: 1.2em;
+  /* each new line fades + lifts in (keyed remount in JSX) */
+  animation: wtourLineIn 0.5s ease both;
+}
+@keyframes wtourLineIn {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Hairline progress thread that fills toward the reveal. */
+.wtour-processing__track {
+  width: 200px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(184, 160, 128, 0.2);
+  overflow: hidden;
+}
+.wtour-processing__track span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  transform-origin: left;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--olive-500, #6b8035), var(--gold-accent, #b8a080));
+  animation-name: wtourFill;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes wtourFill {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+
+/* ── Prompt ── */
+.wtour-stage--prompt { animation: none; }
+
+.wtour-prompt {
+  position: relative;
+  width: min(520px, 92vw);
+  background: linear-gradient(180deg, #ffffff 0%, #fdfbf6 100%);
+  border: 1px solid rgba(184, 160, 128, 0.3);
+  border-radius: 24px;
+  padding: 46px 48px 38px;
+  box-shadow:
+    0 40px 80px -24px rgba(31, 27, 22, 0.28),
+    0 8px 24px -10px rgba(31, 27, 22, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* slow, graceful appear */
+  animation: wtourRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* hairline gold accent along the very top edge — a quiet luxury detail */
+.wtour-prompt::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-accent, #b8a080), transparent);
+}
+@keyframes wtourRise {
+  0%   { opacity: 0; transform: translateY(22px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wtour-prompt__spark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  margin-bottom: 22px;
+  color: #fff;
+  background: linear-gradient(150deg, var(--gold-light, #d4c4a8), var(--gold-accent, #b8a080));
+  box-shadow:
+    0 6px 16px rgba(184, 160, 128, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.wtour-prompt__eyebrow {
+  font-family: var(--font-body, "Inter", sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-accent, #b8a080);
+  margin-bottom: 10px;
+}
+.wtour-prompt__title {
+  font-family: var(--font-heading, "Cormorant Garamond", serif);
+  font-size: 3rem;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text-primary, #1a1a1a);
+  margin: 0 0 14px;
+}
+.wtour-prompt__desc {
+  font-family: var(--font-body, "Inter", sans-serif);
+  font-size: 1.02rem;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--text-secondary, #4a4a4a);
+  margin: 0 0 30px;
+  max-width: 40ch;
+}
+.wtour-prompt__desc em {
+  font-style: italic;
+  color: var(--olive-700, #4a5d23);
+  font-weight: 500;
+}
+.wtour-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  width: 100%;
+  max-width: 300px;
+}
+
+/* ── Shared buttons ── */
+.wtour-btn {
+  font-family: var(--font-body, "Inter", sans-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: 12px;
+  padding: 11px 18px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.15s, box-shadow 0.2s, background 0.2s, color 0.15s, border-color 0.2s;
+}
+.wtour-btn--lg { width: 100%; padding: 14px 24px; font-size: 0.95rem; }
+.wtour-btn:active { transform: translateY(1px); }
+
+.wtour-btn--primary {
+  color: #fff;
+  background: linear-gradient(145deg, var(--olive-500, #6b8035), var(--olive-700, #4a5d23));
+  box-shadow: 0 10px 22px -6px rgba(74, 93, 35, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.wtour-btn--primary:hover {
+  background: linear-gradient(145deg, #748a3a, var(--olive-600, #556b2f));
+  box-shadow: 0 14px 28px -6px rgba(74, 93, 35, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+.wtour-btn--ghost {
+  color: var(--text-secondary, #4a4a4a);
+  background: #fff;
+  border-color: rgba(184, 160, 128, 0.45);
+}
+.wtour-btn--ghost:hover {
+  background: var(--bg-secondary, #f5f3ee);
+  border-color: var(--gold-accent, #b8a080);
+  color: var(--text-primary, #1a1a1a);
+}
+
+@keyframes wtourFadeUp {
+  0%   { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Resting dashboard card (skipped state) ─────────────────────────────────
+   A small, collapsible nudge pinned bottom-left (clear of the Copilot bubble). */
+.wtour-card {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 110;
+  width: 320px;
+  max-width: calc(100vw - 48px);
+  background: var(--bg-card, #fff);
+  border: 1px solid rgba(184, 160, 128, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(31, 27, 22, 0.16);
+  overflow: hidden;
+  animation: wtourCardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes wtourCardIn {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wtour-card__head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 14px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.wtour-card__spark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: var(--olive-700, #4a5d23);
+  background: radial-gradient(circle at 30% 30%, rgba(184, 160, 128, 0.3), rgba(85, 107, 47, 0.12));
+}
+.wtour-card__head-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.wtour-card__head-text strong { font-size: 0.92rem; color: var(--text-primary, #2b2b2b); }
+.wtour-card__head-text span { font-size: 0.78rem; color: var(--text-muted, #7a7a7a); }
+.wtour-card__chevron {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted, #7a7a7a);
+  transition: transform 0.28s ease;
+  flex-shrink: 0;
+}
+.wtour-card__chevron.is-collapsed { transform: rotate(-90deg); }
+
+.wtour-card__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.3s ease, opacity 0.25s ease;
+  opacity: 1;
+}
+.wtour-card.is-collapsed .wtour-card__body { grid-template-rows: 0fr; opacity: 0; }
+.wtour-card__actions {
+  overflow: hidden;
+  display: flex;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+.wtour-card__actions .wtour-btn { flex: 1; }
+
+@media (max-width: 560px) {
+  .wtour-card { left: 12px; right: 12px; bottom: 12px; width: auto; }
+  .wtour-prompt { padding: 32px 24px 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wtour-screen, .wtour-prompt, .wtour-stage--processing, .wtour-card,
+  .wtour-orb__core, .wtour-orb__halo, .wtour-orb__ring, .wtour-orb__dust i,
+  .wtour-processing__title, .wtour-processing__sub, .wtour-screen__bg::after {
+    animation: none !important;
+    transition: opacity 0.2s ease !important;
+  }
+  /* keep the title legible without the shimmer clip */
+  .wtour-processing__title { -webkit-text-fill-color: var(--text-primary, #1a1a1a); }
+  .wtour-processing__track span { transform: scaleX(1); }
+}

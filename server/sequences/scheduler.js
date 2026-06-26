@@ -1,6 +1,7 @@
 import { tick } from "./engine.js";
 import { TICK_MS } from "./constants.js";
 import { setKicker } from "./kick.js";
+import { sweepActiveSequenceCaps } from "./capSweep.js";
 
 /**
  * The in-process heartbeat. Primary clock for the engine; a guard ensures only one tick
@@ -9,6 +10,12 @@ import { setKicker } from "./kick.js";
 let running = false;
 let timer = null;
 let kickQueued = false;
+
+// Plan-cap sweep rides the heartbeat but only needs to run occasionally — it just
+// enforces downgrade grace deadlines. Rate-limited to hourly so a fast tick interval
+// doesn't hammer it.
+const CAP_SWEEP_MS = 60 * 60 * 1000;
+let lastCapSweep = 0;
 
 export function startScheduler(models) {
   if (process.env.SEQUENCES_SCHEDULER_DISABLED === "1") return null;
@@ -19,6 +26,14 @@ export function startScheduler(models) {
     running = true;
     try {
       await tick({ models });
+      if (Date.now() - lastCapSweep >= CAP_SWEEP_MS) {
+        lastCapSweep = Date.now();
+        try {
+          await sweepActiveSequenceCaps(models);
+        } catch (e) {
+          console.error("⚠️ Active-sequence cap sweep error:", e?.message);
+        }
+      }
     } catch (e) {
       console.error("⚠️ Sequence tick error:", e?.message);
     } finally {

@@ -50,6 +50,18 @@ interface ChangeItem {
   newValue: string;
 }
 
+interface AuditEntry {
+  _id: string;
+  adminEmail: string;
+  action: string;
+  method: string;
+  path: string;
+  targetEmail: string;
+  changes: string[];
+  ip: string;
+  at: string;
+}
+
 /* ─── Tier Credit Caps ─── */
 
 const TIER_CAPS: Record<string, number> = {
@@ -69,6 +81,15 @@ const AdminPage: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Active view: user management vs. audit trail
+  const [view, setView] = useState<"users" | "audit">("users");
+
+  // Audit log
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(false);
+  const [auditHasMore, setAuditHasMore] = useState(false);
 
   // Search & filter
   const [search, setSearch] = useState("");
@@ -123,6 +144,36 @@ const AdminPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  /* ─── Fetch audit log (read-only) ─── */
+
+  const fetchAudit = useCallback(async (before?: string) => {
+    try {
+      setAuditLoading(true);
+      const qs = new URLSearchParams({ limit: "50" });
+      if (before) qs.set("before", before);
+      const res = await authFetch(`/api/admin/audit?${qs.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch audit log");
+      const data = await res.json();
+      setAudit((prev) =>
+        before ? [...prev, ...data.entries] : data.entries
+      );
+      setAuditHasMore(data.hasMore);
+      setAuditLoaded(true);
+    } catch (err) {
+      setError("Failed to load audit log. Please refresh.");
+      console.error("Audit fetch error:", err);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
+  // Lazy-load the audit trail the first time the tab is opened.
+  useEffect(() => {
+    if (view === "audit" && !auditLoaded) {
+      fetchAudit();
+    }
+  }, [view, auditLoaded, fetchAudit]);
+
   /* ─── Filtered users ─── */
 
   const filteredUsers = useMemo(() => {
@@ -160,6 +211,15 @@ const AdminPage: React.FC = () => {
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+
+  const formatDateTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
 
   const creditPercent = (credits: number, allocation: number) => {
@@ -322,6 +382,20 @@ const AdminPage: React.FC = () => {
           </a>
           <h1 className="admin__topbar-title">Admin Panel</h1>
           <span className="admin__topbar-badge">Admin</span>
+          <div className="admin__tabs">
+            <button
+              className={`admin__tab ${view === "users" ? "admin__tab--active" : ""}`}
+              onClick={() => setView("users")}
+            >
+              Users
+            </button>
+            <button
+              className={`admin__tab ${view === "audit" ? "admin__tab--active" : ""}`}
+              onClick={() => setView("audit")}
+            >
+              Audit Log
+            </button>
+          </div>
         </div>
         <div className="admin__topbar-right">
           <span>Signed in as</span>
@@ -356,7 +430,7 @@ const AdminPage: React.FC = () => {
             <div className="admin__spinner" />
             <span>Loading admin data…</span>
           </div>
-        ) : (
+        ) : view === "users" ? (
           <>
             {/* Stats Overview */}
             {stats && (
@@ -573,6 +647,112 @@ const AdminPage: React.FC = () => {
               )}
             </div>
           </>
+        ) : (
+          /* ─── Audit Log View (read-only) ─── */
+          <div className="admin__audit">
+            <div className="admin__audit-head">
+              <div>
+                <h2 className="admin__audit-title">Admin Audit Trail</h2>
+                <p className="admin__audit-sub">
+                  Read-only record of every admin action. Newest first.
+                </p>
+              </div>
+              <button
+                className="admin__filter-btn"
+                onClick={() => fetchAudit()}
+                disabled={auditLoading}
+              >
+                {auditLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+
+            {!auditLoaded && auditLoading ? (
+              <div className="admin__loading">
+                <div className="admin__spinner" />
+                <span>Loading audit log…</span>
+              </div>
+            ) : audit.length === 0 ? (
+              <div className="admin__empty">
+                <div className="admin__empty-title">No audit entries yet</div>
+                <div className="admin__empty-desc">
+                  Admin actions will appear here once they happen.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="admin__table-wrap">
+                  <table className="admin__table admin__audit-table">
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>Admin</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Changes</th>
+                        <th>IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {audit.map((e) => (
+                        <tr key={e._id}>
+                          <td>
+                            <span className="admin__date-cell">
+                              {formatDateTime(e.at)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="admin__user-email">
+                              {e.adminEmail || "—"}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="admin__audit-action">
+                              {e.action}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="admin__user-email">
+                              {e.targetEmail || "—"}
+                            </span>
+                          </td>
+                          <td>
+                            {e.changes.length > 0 ? (
+                              <div className="admin__audit-changes">
+                                {e.changes.map((c, i) => (
+                                  <span key={i} className="admin__audit-chip">
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td>
+                            <span className="admin__date-cell">
+                              {e.ip || "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {auditHasMore && (
+                  <div className="admin__audit-more">
+                    <button
+                      className="admin__filter-btn"
+                      onClick={() => fetchAudit(audit[audit.length - 1]?.at)}
+                      disabled={auditLoading}
+                    >
+                      {auditLoading ? "Loading…" : "Load more"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
 

@@ -24,7 +24,7 @@ export const DEFAULTS = {
   mode: "auto", // "auto" | "approval"
   stopOnReply: true,
   stopOnClosed: true,
-  maxPerClientPerDay: num(process.env.SEQUENCES_MAX_PER_CLIENT_PER_DAY, 2),
+  maxPerClientPerDay: num(process.env.SEQUENCES_MAX_PER_CLIENT_PER_DAY, 5),
   maxStepsPerEnrollment: MAX_STEPS_PER_ENROLLMENT,
 };
 

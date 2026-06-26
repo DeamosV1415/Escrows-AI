@@ -238,6 +238,14 @@ export async function processEnrollment({ models, senders = realSenders, enrollm
     settings.timezone = brokerSettings.defaultTimezone;
   }
 
+  // Per-broker defaults are authoritative for these knobs (per-sequence overrides are
+  // deferred). The rate cap MUST be broker-level: the count is across all sequences, so a
+  // per-sequence number would be incoherent. Fall back to the per-sequence/DEFAULTS value
+  // only when the broker hasn't set one.
+  if (brokerSettings?.maxPerClientPerDay != null) settings.maxPerClientPerDay = brokerSettings.maxPerClientPerDay;
+  if (brokerSettings?.stopOnReply != null) settings.stopOnReply = brokerSettings.stopOnReply;
+  if (brokerSettings?.stopOnClosed != null) settings.stopOnClosed = brokerSettings.stopOnClosed;
+
   const user = await models.User.findById(e.userId).lean();
   let client = e.clientId ? await models.Client.findById(e.clientId).lean() : null;
 

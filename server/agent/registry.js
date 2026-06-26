@@ -86,3 +86,6 @@ class ToolRegistry {
 
 const registry = new ToolRegistry();
 export default registry;
+// The class itself, so other agents (e.g. the Sequences sub-agent) can build their own
+// isolated registry instead of sharing the copilot singleton above.
+export { ToolRegistry };

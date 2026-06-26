@@ -1,8 +1,20 @@
+import { PLANS } from "../config/plans.js";
+
+// Credit tiers derive from the central PLANS catalog so allocations can never drift
+// from the rest of a plan's limits. `enterprise` is the one exception — a custom,
+// unlimited tier set by admins, not part of the public pricing catalog.
+const fromPlan = (id) => ({
+  monthlyAllocation: PLANS[id].credits,
+  unlimited: false,
+  label: PLANS[id].label,
+  price: PLANS[id].price.month === 0 ? "$0/mo" : `$${PLANS[id].price.month}/mo`,
+});
+
 const TIERS = {
-  free:       { monthlyAllocation: 40,   unlimited: false, label: "Free",       price: "$0/mo"   },
-  growth:     { monthlyAllocation: 250,  unlimited: false, label: "Growth",     price: "$35/mo"  },
-  pro:        { monthlyAllocation: 700,  unlimited: false, label: "Pro",        price: "$70/mo"  },
-  enterprise: { monthlyAllocation: 0,    unlimited: true,  label: "Enterprise", price: "Custom"  },
+  free: fromPlan("free"),
+  growth: fromPlan("growth"),
+  pro: fromPlan("pro"),
+  enterprise: { monthlyAllocation: 0, unlimited: true, label: "Enterprise", price: "Custom" },
 };
 
 function tierConfig(tier) {

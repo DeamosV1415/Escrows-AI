@@ -13,6 +13,7 @@ import Footer from "./components/Footer";
 import ThreeBackground from "./components/ThreeBackground";
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardPage from "./pages/DashboardPage";
+import ReportPage from "./pages/ReportPage";
 import ClientsPage from "./pages/ClientsPage";
 import InventoryPage from "./pages/InventoryPage";
 import SequencesPage from "./pages/SequencesPage";
@@ -113,9 +114,9 @@ function App() {
           {/* Onboarding profile form */}
           <Route path="/onboarding" element={<OnboardingPage />} />
 
-          {/* Admin Panel (standalone, email-gated) */}
+          {/* Admin Panel (standalone, email-gated) — obscured path for security */}
           <Route
-            path="/admin"
+            path="/riasxakeno"
             element={
               <AdminProtectedRoute>
                 <AdminPage />
@@ -142,6 +143,16 @@ function App() {
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
+
+          {/* Printable report (protected, standalone — no sidebar shell) */}
+          <Route
+            path="/dashboard/report"
+            element={
+              <ProtectedRoute>
+                <ReportPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Landing / public pages (catch-all) */}
           <Route path="/*" element={<LandingPage />} />

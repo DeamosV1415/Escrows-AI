@@ -239,10 +239,27 @@ export default function createAuthRouter(User) {
           location: user.location,
           specialization: user.specialization,
           teamSize: user.teamSize,
+          getStartedDismissed: user.getStartedDismissed,
         },
       });
     } catch (err) {
       return res.status(401).json({ error: "Invalid token." });
+    }
+  });
+
+  // ─── POST /api/auth/onboarding/dismiss ───
+  // Permanently hides the dashboard "Get started" checklist for this user.
+  router.post("/onboarding/dismiss", async (req, res) => {
+    try {
+      const header = req.headers.authorization;
+      if (!header || !header.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "No token provided." });
+      }
+      const decoded = jwt.verify(header.split(" ")[1], process.env.JWT_SECRET);
+      await User.findByIdAndUpdate(decoded.userId, { $set: { getStartedDismissed: true } });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(401).json({ error: "Invalid token." });
     }
   });
 
@@ -257,23 +274,26 @@ export default function createAuthRouter(User) {
       const token = header.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      const { phone, company, jobTitle, licenseNumber, yearsInBusiness, location, specialization, teamSize } = req.body;
+      const { name, phone, company, jobTitle, licenseNumber, yearsInBusiness, location, specialization, teamSize } = req.body;
+
+      const $set = {
+        phone: phone || "",
+        company: company || "",
+        jobTitle: jobTitle || "",
+        licenseNumber: licenseNumber || "",
+        yearsInBusiness: yearsInBusiness || null,
+        location: location || "",
+        specialization: specialization || "",
+        teamSize: teamSize || "",
+        profileComplete: true,
+      };
+      // Name is editable from Settings; only overwrite when a non-empty value is sent so
+      // the onboarding flow (which omits it) never blanks an existing name.
+      if (typeof name === "string" && name.trim()) $set.name = name.trim();
 
       const user = await User.findByIdAndUpdate(
         decoded.userId,
-        {
-          $set: {
-            phone: phone || "",
-            company: company || "",
-            jobTitle: jobTitle || "",
-            licenseNumber: licenseNumber || "",
-            yearsInBusiness: yearsInBusiness || null,
-            location: location || "",
-            specialization: specialization || "",
-            teamSize: teamSize || "",
-            profileComplete: true,
-          },
-        },
+        { $set },
         { returnDocument: "after" },
       ).select("-password");
 
@@ -281,7 +301,7 @@ export default function createAuthRouter(User) {
         return res.status(404).json({ error: "User not found." });
       }
 
-      console.log(`✅ Profile completed: ${user.name} <${user.email}>`);
+      console.log(`✅ Profile updated: ${user.name} <${user.email}>`);
       res.json({
         user: {
           id: user._id,
@@ -289,6 +309,14 @@ export default function createAuthRouter(User) {
           email: user.email,
           avatar: user.avatar,
           profileComplete: user.profileComplete,
+          phone: user.phone,
+          company: user.company,
+          jobTitle: user.jobTitle,
+          licenseNumber: user.licenseNumber,
+          yearsInBusiness: user.yearsInBusiness,
+          location: user.location,
+          specialization: user.specialization,
+          teamSize: user.teamSize,
         },
       });
     } catch (err) {

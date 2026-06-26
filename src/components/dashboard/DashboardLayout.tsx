@@ -3,8 +3,11 @@ import { Outlet, useLocation } from "react-router-dom";
 import { authFetch } from "../../utils/authFetch";
 import Sidebar from "./Sidebar";
 import ClientModal from "./ClientModal";
+import GlobalSearch from "./GlobalSearch";
 import { CopilotChatProvider } from "./CopilotChatContext";
 import ChatDropdown from "./ChatDropdown";
+import CopilotBubble from "./CopilotBubble";
+import WelcomeTour from "./WelcomeTour";
 import "./DashboardLayout.css";
 
 const DashboardLayout: React.FC = () => {
@@ -32,6 +35,13 @@ const DashboardLayout: React.FC = () => {
     } catch {
       /* timezone detection is best-effort */
     }
+  }, []);
+
+  // Let the global search "＋ New Lead" quick action open the same modal as the header button.
+  useEffect(() => {
+    const onOpenNewLead = () => setNewLeadOpen(true);
+    window.addEventListener("open-new-lead", onOpenNewLead);
+    return () => window.removeEventListener("open-new-lead", onOpenNewLead);
   }, []);
 
   const handleNewLead = async (data: Record<string, unknown>) => {
@@ -87,27 +97,7 @@ const DashboardLayout: React.FC = () => {
               className="dashboard-header__copilot-title"
             />
           ) : (
-            <div className="dashboard-header__search">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search leads, contacts, deals..."
-                className="dashboard-header__search-input"
-              />
-              <kbd className="dashboard-header__search-kbd">⌘K</kbd>
-            </div>
+            <GlobalSearch />
           )}
 
           {/* Right side */}
@@ -211,15 +201,18 @@ const DashboardLayout: React.FC = () => {
           onSubmit={handleNewLead}
         />
       )}
+
+      {/* Floating copilot, remotely accessible on every page except the full Copilot page. */}
+      {!isCopilotPage && <CopilotBubble />}
+
+      {/* Post-onboarding welcome takeover + guided tour (self-hides unless triggered). */}
+      <WelcomeTour />
     </div>
   );
 
-  // Wrap with CopilotChatProvider when on the copilot page
-  // so both the header dropdown and the chat body share state
-  if (isCopilotPage) {
-    return <CopilotChatProvider>{content}</CopilotChatProvider>;
-  }
-  return content;
+  // The CopilotChatProvider now wraps the WHOLE dashboard (not just the copilot page) so the
+  // floating bubble and the full Copilot page share one conversation + composer state.
+  return <CopilotChatProvider>{content}</CopilotChatProvider>;
 };
 
 export default DashboardLayout;

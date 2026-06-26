@@ -242,8 +242,9 @@ test("wait_for_reply: arms, then takes the replied branch when a reply arrives",
     ],
     edges: [edge("t", "wfr"), edge("wfr", "sr", "replied"), edge("sr", "e1"), edge("wfr", "st", "timeout"), edge("st", "e2")],
   };
-  // disable stopOnReply so the reply is resolved by the wait_for_reply node, not a global halt
-  const seq = await makeSeq(user, graph, { stopOnReply: false });
+  // stopOnReply stays ON (the default): because this graph has a wait_for_reply node, the
+  // global stop-on-reply net must step aside so the block's "replied" branch can run.
+  const seq = await makeSeq(user, graph, { stopOnReply: true });
   const enr = await enrollClient({ models, sequence: seq, clientId: client._id, now: NOON });
 
   const mock = mockSenders(models);
@@ -379,6 +380,25 @@ test("send defers when the per-client daily cap is hit", async (t) => {
   const after = await models.SequenceEnrollment.findById(enr._id).lean();
   assert.equal(after.status, "active");
   assert.equal(mock.calls.length, 0, "rate cap blocked the send");
+});
+
+test("per-broker rate cap (SequenceSettings) overrides and defers the send", async (t) => {
+  if (!available) return t.skip("no mongo");
+  const user = await makeUser();
+  const client = await makeClient(user);
+  // Sequence carries no tight cap of its own; the broker-level setting is authoritative.
+  const seq = await makeSeq(user, simpleSendGraph(), { maxPerClientPerDay: 50 });
+  await models.SequenceSettings.create({ userId: user._id, maxPerClientPerDay: 1 });
+  await models.Message.create({
+    userId: user._id, channel: "whatsapp", contactIdentifier: "4155550001",
+    direction: "outbound", body: "earlier today", status: "delivered", timestamp: new Date(NOON.getTime() - 3600000),
+  });
+  const enr = await enrollClient({ models, sequence: seq, clientId: client._id, now: NOON });
+  const mock = mockSenders(models);
+  await tick({ models, senders: mock.senders, now: NOON });
+  const after = await models.SequenceEnrollment.findById(enr._id).lean();
+  assert.equal(after.status, "active");
+  assert.equal(mock.calls.length, 0, "broker cap of 1 blocked the send despite the sequence allowing 50");
 });
 
 test("broker kill switch pauses execution", async (t) => {

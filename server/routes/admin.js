@@ -1,4 +1,5 @@
 import express from "express";
+import { logAdminAction } from "../utils/adminAudit.js";
 
 /**
  * Tier → default credit allocations.
@@ -12,13 +13,54 @@ const TIER_DEFAULTS = {
   enterprise: { monthlyAllocation: 2000, credits: 2000 },
 };
 
-export default function createAdminRouter(User, CreditAccount) {
+export default function createAdminRouter(User, CreditAccount, AdminAudit) {
   const router = express.Router();
 
   // ─── GET /api/admin/verify ───
   // Lightweight check — if the admin middleware passed, user is admin
   router.get("/verify", (req, res) => {
     res.json({ admin: true, email: req.adminEmail });
+  });
+
+  // ─── GET /api/admin/audit ───
+  // Read-only audit trail, newest-first. Supports ?limit and ?before (cursor
+  // on `at`) for pagination.
+  router.get("/audit", async (req, res) => {
+    if (!AdminAudit) {
+      return res.json({ entries: [], hasMore: false });
+    }
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const filter = {};
+      if (req.query.before) {
+        const before = new Date(req.query.before);
+        if (!isNaN(before.getTime())) filter.at = { $lt: before };
+      }
+
+      // Fetch one extra row to determine whether more pages exist.
+      const rows = await AdminAudit.find(filter)
+        .sort({ at: -1 })
+        .limit(limit + 1)
+        .lean();
+
+      const hasMore = rows.length > limit;
+      const entries = rows.slice(0, limit).map((r) => ({
+        _id: String(r._id),
+        adminEmail: r.adminEmail,
+        action: r.action,
+        method: r.method,
+        path: r.path,
+        targetEmail: r.targetEmail,
+        changes: Array.isArray(r.changes) ? r.changes : [],
+        ip: r.ip,
+        at: r.at,
+      }));
+
+      res.json({ entries, hasMore });
+    } catch (err) {
+      console.error("Admin audit fetch error:", err.message);
+      res.status(500).json({ error: "Failed to fetch audit log." });
+    }
   });
 
   // ─── GET /api/admin/stats ───
@@ -211,6 +253,14 @@ export default function createAdminRouter(User, CreditAccount) {
       console.log(
         `🛡️ [Admin] ${req.adminEmail} updated ${user.name} <${user.email}>: ${changes.join(", ")}`
       );
+
+      // Persist a tamper-evident audit record (best-effort, never blocks).
+      logAdminAction(req, {
+        action: "user.update",
+        targetUserId: id,
+        targetEmail: user.email,
+        changes,
+      });
 
       res.json({
         success: true,

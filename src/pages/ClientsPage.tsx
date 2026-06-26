@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import "./ClientsPage.css";
 import { authFetch } from "../utils/authFetch";
 import ClientModal from "../components/dashboard/ClientModal";
@@ -111,6 +112,11 @@ const ClientsPage: React.FC = () => {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
+  // Deep-link from the global header search: open a client's detail modal, or
+  // pre-fill the search box for a "see all" handoff.
+  const location = useLocation();
+  const [pendingClientId, setPendingClientId] = useState<string | null>(null);
+
   const loadClients = useCallback(async () => {
     try {
       setLoading(true);
@@ -142,6 +148,25 @@ const ClientsPage: React.FC = () => {
     window.addEventListener("client-updated", handler);
     return () => window.removeEventListener("client-updated", handler);
   }, [loadClients]);
+
+  // Read navigation state from the global search (openClientId or search handoff).
+  useEffect(() => {
+    const state = location.state as { openClientId?: string; search?: string } | null;
+    if (!state) return;
+    if (state.search) setSearch(state.search);
+    if (state.openClientId) setPendingClientId(state.openClientId);
+    window.history.replaceState({}, ""); // don't re-apply on refresh
+  }, [location.state]);
+
+  // Once the matching client is loaded, open its detail modal.
+  useEffect(() => {
+    if (!pendingClientId) return;
+    const match = clients.find((c) => c._id === pendingClientId);
+    if (match) {
+      setDetailClient(match);
+      setPendingClientId(null);
+    }
+  }, [pendingClientId, clients]);
 
   /* ─── CRUD handlers ─── */
   const handleCreate = async (data: Partial<Client>) => {

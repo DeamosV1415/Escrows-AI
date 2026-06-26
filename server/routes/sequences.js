@@ -5,6 +5,7 @@ import { validateGraph } from "../sequences/validator.js";
 import { dryRun as engineDryRun, wakeAwaitingDocument } from "../sequences/engine.js";
 import { enrollManual } from "../sequences/triggers.js";
 import { TEMPLATES, getTemplate, triggerOf } from "../sequences/templates.js";
+import { getActiveSequenceLimit } from "../config/plans.js";
 
 /**
  * REST API for the Sequences module (mounted under authMiddleware). Factory pattern,
@@ -16,9 +17,17 @@ import { TEMPLATES, getTemplate, triggerOf } from "../sequences/templates.js";
  */
 export default function createSequencesRouter(models) {
   const router = express.Router();
-  const { Sequence, SequenceEnrollment, SequenceEvent, SequenceSettings, Notification, Client, DocumentRequest } = models;
+  const { Sequence, SequenceEnrollment, SequenceEvent, SequenceSettings, Notification, Client, DocumentRequest, User } = models;
 
   const oid = (id) => mongoose.isValidObjectId(id);
+
+  // Resolve a user's plan for the active-sequence cap. Falls back to "free" so
+  // enforcement stays safe before billing/plan-selection is fully wired up.
+  async function getUserPlan(userId) {
+    if (!User) return "free";
+    const u = await User.findById(userId).select("plan").lean();
+    return u?.plan || "free";
+  }
 
   // A starter graph for a blank sequence: manual trigger straight to an end.
   function blankGraph() {
@@ -93,6 +102,9 @@ export default function createSequencesRouter(models) {
         killSwitch: !!s?.killSwitch,
         defaultTimezone: s?.defaultTimezone || "UTC",
         defaultQuietHours: s?.defaultQuietHours || { start: "21:00", end: "08:00" },
+        maxPerClientPerDay: s?.maxPerClientPerDay ?? 5,
+        stopOnReply: s?.stopOnReply ?? true,
+        stopOnClosed: s?.stopOnClosed ?? true,
       });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -102,7 +114,7 @@ export default function createSequencesRouter(models) {
   router.post("/settings", async (req, res) => {
     try {
       const $set = {};
-      const { defaultTimezone, defaultQuietHours } = req.body;
+      const { defaultTimezone, defaultQuietHours, maxPerClientPerDay, stopOnReply, stopOnClosed } = req.body;
       // Accept a timezone only if it's a real IANA zone the runtime understands.
       if (typeof defaultTimezone === "string" && defaultTimezone) {
         try {
@@ -113,13 +125,29 @@ export default function createSequencesRouter(models) {
       if (defaultQuietHours?.start && defaultQuietHours?.end) {
         $set.defaultQuietHours = { start: defaultQuietHours.start, end: defaultQuietHours.end };
       }
+      // Rate cap: integer 0–50 (0 disables capping). Reject junk silently rather than 500.
+      if (maxPerClientPerDay != null) {
+        const n = Math.floor(Number(maxPerClientPerDay));
+        if (Number.isFinite(n) && n >= 0 && n <= 50) $set.maxPerClientPerDay = n;
+      }
+      if (typeof stopOnReply === "boolean") $set.stopOnReply = stopOnReply;
+      if (typeof stopOnClosed === "boolean") $set.stopOnClosed = stopOnClosed;
       if (!Object.keys($set).length) return res.json({ success: true, unchanged: true });
       const s = await SequenceSettings.findOneAndUpdate(
         { userId: req.userId },
         { $set },
         { upsert: true, returnDocument: "after" },
       ).lean();
-      res.json({ success: true, settings: { defaultTimezone: s.defaultTimezone, defaultQuietHours: s.defaultQuietHours } });
+      res.json({
+        success: true,
+        settings: {
+          defaultTimezone: s.defaultTimezone,
+          defaultQuietHours: s.defaultQuietHours,
+          maxPerClientPerDay: s.maxPerClientPerDay,
+          stopOnReply: s.stopOnReply,
+          stopOnClosed: s.stopOnClosed,
+        },
+      });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -252,18 +280,27 @@ export default function createSequencesRouter(models) {
     }
   });
 
-  // AI generation — Phase 3 (the constrained sub-agent). Stubbed for now.
-  router.post("/generate", (req, res) => {
-    res.status(501).json({ error: "AI sequence generation ships in a later phase." });
-  });
+  // AI generation (Phase 3) is handled by the constrained Sequences sub-agent over the
+  // chat engine — POST /api/agent/chat with { mode: "sequences" } (and an optional
+  // sequenceId for editing). It streams + saves a draft via the save_sequence tool. No
+  // dedicated /generate endpoint is needed here.
 
   /* ───────────────────────── collection + item routes ───────────────────────── */
 
   // List sequences (+ denormalized stats).
   router.get("/", async (req, res) => {
     try {
-      const seqs = await Sequence.find({ userId: req.userId }).sort({ updatedAt: -1 }).lean();
-      res.json({ sequences: seqs });
+      const [seqs, user] = await Promise.all([
+        Sequence.find({ userId: req.userId }).sort({ updatedAt: -1 }).lean(),
+        User ? User.findById(req.userId).select("plan planGraceUntil").lean() : null,
+      ]);
+      const plan = user?.plan || "free";
+      const activeLimit = getActiveSequenceLimit(plan);
+      const activeCount = seqs.filter((s) => s.status === "active").length;
+      res.json({
+        sequences: seqs,
+        usage: { plan, activeLimit, activeCount, graceUntil: user?.planGraceUntil || null },
+      });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -358,10 +395,28 @@ export default function createSequencesRouter(models) {
       const seq = await Sequence.findOne({ _id: req.params.id, userId: req.userId });
       if (!seq) return res.status(404).json({ error: "Sequence not found" });
 
-      // Can't activate a graph that doesn't validate.
-      if (target === "active") {
+      // Activating a sequence that isn't already active: validate the graph and
+      // enforce the plan's active-sequence cap (drafts are unlimited; only the
+      // number running at once is gated). Pausing/archiving always frees a slot.
+      if (target === "active" && seq.status !== "active") {
         const v = validateGraph(seq.graph, registry);
         if (!v.ok) return res.status(400).json({ error: "Cannot activate an invalid sequence", errors: v.errors });
+
+        const [plan, activeCount] = await Promise.all([
+          getUserPlan(req.userId),
+          Sequence.countDocuments({ userId: req.userId, status: "active" }),
+        ]);
+        const limit = getActiveSequenceLimit(plan);
+        if (activeCount >= limit) {
+          return res.status(403).json({
+            error: `Your ${plan} plan allows ${limit} active sequence${limit === 1 ? "" : "s"} at once. Pause one to activate another, or upgrade for more.`,
+            code: "ACTIVE_LIMIT",
+            plan,
+            limit,
+            activeCount,
+          });
+        }
+        seq.activatedAt = new Date(); // freshest activation wins if a downgrade later forces auto-pause
       }
       seq.status = target;
       await seq.save();

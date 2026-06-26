@@ -38,8 +38,16 @@ export function routeFromRouter(state) {
  * Streams tokens via streamEvents subscribers automatically.
  */
 export async function agentNode(state, config) {
-  const { models } = config.configurable;
-  const user = await models.User.findById(state.userId).select("name email company").lean();
+  const { models, emit } = config.configurable;
+  // The graph is registry-agnostic: the copilot passes nothing (falls back to the
+  // global registry + default prompt), the sequences sub-agent passes its own
+  // tool registry + a `buildSystemPrompt` override via configurable.
+  const reg = config.configurable.registry || registry;
+  const promptOverride = config.configurable.buildSystemPrompt;
+  // Surface a Claude-style "thinking" status while the LLM call is in flight.
+  // Tokens (or a tool_progress event) will replace it as soon as they arrive.
+  emit?.({ type: "status", phase: "thinking" });
+  const user = await models.User.findById(state.userId).select("name email company phone").lean();
   const credits = await getBalanceInfo(models.CreditAccount, state.userId);
 
   const llm = new ChatOpenAI({
@@ -49,16 +57,13 @@ export async function agentNode(state, config) {
     openAIApiKey: process.env.OPENAI_API_KEY,
   });
 
-  const tools = registry.buildLLMTools();
+  const tools = reg.buildLLMTools();
   const llmWithTools = llm.bindTools(tools);
 
-  const sys = new SystemMessage(
-    buildSystemPrompt({
-      toolSummary: registry.buildPromptSummary(),
-      user: user || {},
-      credits,
-    }),
-  );
+  const sysText = promptOverride
+    ? promptOverride({ registry: reg, user: user || {}, credits, configurable: config.configurable })
+    : buildSystemPrompt({ toolSummary: reg.buildPromptSummary(), user: user || {}, credits });
+  const sys = new SystemMessage(sysText);
   const reply = await llmWithTools.invoke([sys, ...state.messages]);
   return { messages: [reply] };
 }
@@ -76,27 +81,66 @@ export function routeFromAgent(state) {
  */
 export async function confirmGateNode(state, config) {
   const { models } = config.configurable;
+  const reg = config.configurable.registry || registry;
   const ai = lastAIMessage(state.messages);
   const calls = ai?.tool_calls || [];
   const approved = new Set(state.approvedToolCallIds || []);
 
+  // Collect EVERY sensitive, not-yet-approved call so the whole batch can be
+  // confirmed in a single card — rather than one prompt per call, which made
+  // "create 10 clients" turn into ten confirmation loops.
+  const pendingCalls = [];
   for (const call of calls) {
-    const tool = registry.get(call.name);
+    const tool = reg.get(call.name);
     if (!tool) continue;
     if (!tool.sensitive) continue;
     if (approved.has(call.id)) continue;
 
-    const description = tool.buildDescription
-      ? safeBuild(tool.buildDescription, call.args)
-      : `Run **${tool.name}**?`;
+    let description;
+    if (tool.buildDescription) {
+      // buildDescription may be async — it can look up human names (client,
+      // contact, item) so the confirmation never shows a raw Mongo id.
+      try { description = await tool.buildDescription(call.args || {}, { models, userId: state.userId }); }
+      catch (e) { description = `(could not render description: ${e.message})`; }
+    } else {
+      description = `Run **${tool.name}**?`;
+    }
+
+    pendingCalls.push({
+      toolCallId: call.id,
+      toolName: tool.name,
+      toolArgs: call.args,
+      creditCost: tool.creditCost,
+      description,
+    });
+  }
+
+  if (pendingCalls.length) {
+    // Group by tool name ("same nature") for a clean one-line headline.
+    const groupMap = new Map();
+    for (const c of pendingCalls) {
+      const g = groupMap.get(c.toolName) || { toolName: c.toolName, count: 0, creditCost: 0 };
+      g.count += 1;
+      g.creditCost += c.creditCost;
+      groupMap.set(c.toolName, g);
+    }
+    const groups = Array.from(groupMap.values());
+    const totalCreditCost = pendingCalls.reduce((s, c) => s + c.creditCost, 0);
+    const first = pendingCalls[0];
 
     return {
       pendingConfirmation: {
-        toolCallId: call.id,
-        toolName: tool.name,
-        toolArgs: call.args,
-        creditCost: tool.creditCost,
-        description,
+        batched: true,
+        calls: pendingCalls,
+        groups,
+        totalCreditCost,
+        summary: buildBatchSummary(groups),
+        // Legacy single-call mirror so older clients keep working.
+        toolCallId: first.toolCallId,
+        toolName: first.toolName,
+        toolArgs: first.toolArgs,
+        creditCost: first.creditCost,
+        description: pendingCalls.length === 1 ? first.description : buildBatchSummary(groups),
       },
     };
   }
@@ -105,7 +149,7 @@ export async function confirmGateNode(state, config) {
   // fail fast with a friendly message instead of partway through a batch.
   let totalCost = 0;
   for (const call of calls) {
-    const t = registry.get(call.name);
+    const t = reg.get(call.name);
     if (t) totalCost += t.creditCost;
   }
   if (totalCost > 0) {
@@ -124,9 +168,24 @@ export function routeFromConfirmGate(state) {
   return "tools";
 }
 
-function safeBuild(fn, args) {
-  try { return fn(args || {}); }
-  catch (e) { return `(could not render description: ${e.message})`; }
+/**
+ * Turn grouped tool calls into a human headline, e.g.
+ *   [{create_client x10}]                  → "Create 10 clients"
+ *   [{delete_client x3}, {send_email x2}]  → "Delete 3 clients and send 2 emails"
+ * Generic: verb = first segment of the tool name, noun = the rest.
+ */
+function buildBatchSummary(groups) {
+  const phrase = (g, lead) => {
+    const [verb, ...nounParts] = g.toolName.split("_");
+    let noun = nounParts.join(" ") || "item";
+    if (g.count !== 1) noun += "s";
+    const v = lead ? verb.charAt(0).toUpperCase() + verb.slice(1) : verb;
+    return `${v} ${g.count} ${noun}`;
+  };
+  if (groups.length === 1) return `${phrase(groups[0], true)}?`;
+  const parts = groups.map((g, i) => phrase(g, i === 0));
+  const last = parts.pop();
+  return `${parts.join(", ")} and ${last}?`;
 }
 
 /**
@@ -134,71 +193,67 @@ function safeBuild(fn, args) {
  * credits per successful call, and appends a ToolMessage for each.
  */
 export async function toolsNode(state, config) {
-  const { models, gridfsBucket } = config.configurable;
+  const { models, gridfsBucket, emit } = config.configurable;
+  const reg = config.configurable.registry || registry;
   const ai = lastAIMessage(state.messages);
   const calls = ai?.tool_calls || [];
+  const total = calls.length;
   const out = [];
   let lastBalance = state.creditsRemaining;
 
-  for (const call of calls) {
-    const tool = registry.get(call.name);
+  const fail = (call, error) =>
+    new ToolMessage({ tool_call_id: call.id, name: call.name, content: JSON.stringify({ error }) });
+
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    const index = i + 1;
+    const tool = reg.get(call.name);
+
+    // Tell the client which step we're on so the UI can show "Creating client (3 / 10)".
+    emit?.({ type: "tool_progress", phase: "start", index, total, toolName: call.name });
+
+    let msg;
+    let ok = false;
+
     if (!tool) {
-      out.push(new ToolMessage({
-        tool_call_id: call.id,
-        name: call.name,
-        content: JSON.stringify({ error: `Unknown tool: ${call.name}` }),
-      }));
-      continue;
+      msg = fail(call, `Unknown tool: ${call.name}`);
+    } else {
+      // Validate args defensively (the LLM is usually correct, but Zod catches drift).
+      let parsed;
+      try {
+        parsed = tool.schema.parse(call.args || {});
+      } catch (e) {
+        msg = fail(call, `Invalid arguments: ${e.message}`);
+      }
+
+      // Pre-flight credit check for THIS specific tool.
+      if (!msg) {
+        const pre = await hasCredits(models.CreditAccount, state.userId, tool.creditCost);
+        if (!pre.ok) {
+          msg = fail(call, `Insufficient credits — needs ${tool.creditCost}, you have ${pre.balance}.`);
+        }
+      }
+
+      // Execute + atomically debit AFTER success.
+      if (!msg) {
+        try {
+          const result = await tool.handler(parsed, state.userId, { models, gridfsBucket });
+          const debit = await tryDebit(models.CreditAccount, state.userId, tool.name, tool.creditCost);
+          if (debit.ok) lastBalance = debit.balance;
+          ok = true;
+          msg = new ToolMessage({
+            tool_call_id: call.id,
+            name: call.name,
+            content: typeof result === "string" ? result : JSON.stringify(result),
+          });
+        } catch (e) {
+          msg = fail(call, e.message || "Tool execution failed");
+        }
+      }
     }
 
-    // Validate args defensively (the LLM is usually correct, but Zod catches drift).
-    let parsed;
-    try {
-      parsed = tool.schema.parse(call.args || {});
-    } catch (e) {
-      out.push(new ToolMessage({
-        tool_call_id: call.id,
-        name: call.name,
-        content: JSON.stringify({ error: `Invalid arguments: ${e.message}` }),
-      }));
-      continue;
-    }
-
-    // Pre-flight credit check for THIS specific tool.
-    const pre = await hasCredits(models.CreditAccount, state.userId, tool.creditCost);
-    if (!pre.ok) {
-      out.push(new ToolMessage({
-        tool_call_id: call.id,
-        name: call.name,
-        content: JSON.stringify({
-          error: `Insufficient credits — needs ${tool.creditCost}, you have ${pre.balance}.`,
-        }),
-      }));
-      continue;
-    }
-
-    // Execute.
-    let result;
-    try {
-      result = await tool.handler(parsed, state.userId, { models, gridfsBucket });
-    } catch (e) {
-      out.push(new ToolMessage({
-        tool_call_id: call.id,
-        name: call.name,
-        content: JSON.stringify({ error: e.message || "Tool execution failed" }),
-      }));
-      continue;
-    }
-
-    // Atomically debit AFTER success.
-    const debit = await tryDebit(models.CreditAccount, state.userId, tool.name, tool.creditCost);
-    if (debit.ok) lastBalance = debit.balance;
-
-    out.push(new ToolMessage({
-      tool_call_id: call.id,
-      name: call.name,
-      content: typeof result === "string" ? result : JSON.stringify(result),
-    }));
+    out.push(msg);
+    emit?.({ type: "tool_progress", phase: "done", index, total, toolName: call.name, ok });
   }
 
   return {

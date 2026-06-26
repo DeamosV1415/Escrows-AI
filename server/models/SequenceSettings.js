@@ -13,6 +13,14 @@ const sequenceSettingsSchema = new mongoose.Schema(
       start: { type: String, default: "21:00" },
       end: { type: String, default: "08:00" },
     },
+
+    // Per-broker sequence defaults. These are the AUTHORITATIVE source for the
+    // engine — per-sequence overrides are deferred (Sequence.settings is dormant).
+    // The rate cap is per-broker by nature: the engine counts a client's outbound
+    // messages across ALL sequences in 24h, so the limit can only live in one place.
+    maxPerClientPerDay: { type: Number, default: 5, min: 0 },
+    stopOnReply: { type: Boolean, default: true },
+    stopOnClosed: { type: Boolean, default: true },
   },
   { timestamps: true },
 );

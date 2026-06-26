@@ -1,0 +1,511 @@
+/* ─── Report Page ─────────────────────────────────────────────────────────
+   On-screen preview (grey backdrop, centred sheet) + printed document. Colours
+   are explicit with print-color-adjust:exact so bars/bands survive PDF export. */
+
+.report {
+  --ink: #23241f;
+  --ink-soft: #5c5d54;
+  --ink-faint: #9a9b90;
+  --olive: #4d6620;
+  --olive-deep: #34481a;
+  --line: #e6e6de;
+  --line-soft: #f0f0ea;
+
+  min-height: 100vh;
+  background: #e8e8e2;
+  padding: 24px 16px 60px;
+  font-family: var(--font-body, "Inter", system-ui, sans-serif);
+  color: var(--ink);
+}
+
+/* ─── Screen-only toolbar ─── */
+.report__toolbar {
+  max-width: 8.5in;
+  margin: 0 auto 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report__btn {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: var(--olive);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.report__btn:hover {
+  background: var(--olive-deep);
+}
+.report__btn--ghost {
+  background: #fff;
+  color: var(--olive);
+  border-color: #d6d6cd;
+}
+.report__btn--ghost:hover {
+  background: #f4f4ef;
+}
+
+/* ─── The page sheet ─── */
+.report__page {
+  max-width: 8.5in;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* ─── Cover header band ─── */
+.report__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: linear-gradient(115deg, #4d6620 0%, #38501a 100%);
+  color: #fff;
+  padding: 0.55in 0.7in;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.report__header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.report__logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+}
+
+.report__brand-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.report__brand-sub {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.report__agent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.report__agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.report__agent-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.report__agent-email {
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 1px;
+}
+
+/* ─── Sub-bar (report id / timestamp) ─── */
+.report__subbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0.7in;
+  background: #faf9f5;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.03em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ─── Sections ─── */
+.report__section {
+  padding: 26px 0.7in 0;
+  page-break-inside: avoid;
+}
+.report__section:last-of-type {
+  padding-bottom: 8px;
+}
+.report__section--break {
+  page-break-before: auto;
+}
+
+.report__section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.report__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--olive);
+  letter-spacing: 0.08em;
+}
+.report__section-title {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.report__section-aside {
+  margin-left: auto;
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+}
+
+/* ─── KPI cards ─── */
+.report__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.report__kpi {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 16px 16px 14px;
+  background: #fbfbf8;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__kpi::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--olive);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__kpi-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--olive);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.report__kpi-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 9px;
+}
+.report__kpi-sub {
+  font-size: 0.71rem;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+
+/* ─── Pipeline ─── */
+.report__propbar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 22px;
+  background: var(--line-soft);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__propbar-seg {
+  height: 100%;
+}
+
+.report__pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.report__pl-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.report__pl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.report__pl-label {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  width: 118px;
+  flex-shrink: 0;
+}
+.report__pl-track {
+  flex: 1;
+  height: 9px;
+  background: var(--line-soft);
+  border-radius: 5px;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__pl-fill {
+  height: 100%;
+  border-radius: 5px;
+}
+.report__pl-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  width: 26px;
+  text-align: right;
+}
+.report__pl-pct {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  width: 38px;
+  text-align: right;
+}
+
+/* ─── Weekly chart ─── */
+.report__chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 150px;
+}
+.report__chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+}
+.report__chart-plot {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding-top: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.report__chart-stack {
+  position: relative;
+  width: 56%;
+  max-width: 34px;
+  min-height: 3px;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.report__chart-seg {
+  width: 100%;
+  min-height: 2px;
+}
+.report__chart-stack .report__chart-seg:last-child {
+  border-radius: 5px 5px 0 0;
+}
+.report__chart-count {
+  position: absolute;
+  top: -17px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.report__chart-label {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+.report__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.report__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.report__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ─── Tables ─── */
+.report__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.report__table thead th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  padding: 0 12px 9px;
+  border-bottom: 1.5px solid var(--line);
+}
+.report__table tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+  vertical-align: middle;
+}
+.report__table tbody tr:nth-child(even) {
+  background: #fbfbf8;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__td-strong {
+  font-weight: 600;
+  color: var(--ink) !important;
+}
+.report__td-right {
+  text-align: right;
+}
+
+.report__pill {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 5px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report__pill--high {
+  background: #fbe6e6;
+  color: #b23b3b;
+}
+.report__pill--medium {
+  background: #fbf0df;
+  color: #a9791a;
+}
+.report__pill--low {
+  background: #eef2e2;
+  color: #5a7327;
+}
+
+.report__muted {
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  padding: 4px 0 8px;
+}
+
+/* ─── Footer ─── */
+.report__footer {
+  display: flex;
+  justify-content: space-between;
+  margin: 34px 0.7in 0;
+  padding: 14px 0 26px;
+  border-top: 1px solid var(--line);
+  font-size: 0.71rem;
+  color: var(--ink-faint);
+}
+
+/* ─── Loading / error state ─── */
+.report__state {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  background: #e8e8e2;
+}
+.report__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #d6d6cd;
+  border-top-color: #4d6620;
+  border-radius: 50%;
+  animation: report-spin 0.8s linear infinite;
+}
+@keyframes report-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Print rules ─── */
+@page {
+  size: letter;
+  margin: 0.45in;
+}
+
+@media print {
+  .report {
+    background: #fff;
+    padding: 0;
+  }
+  .report__toolbar {
+    display: none;
+  }
+  .report__page {
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .report__section {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .report__header,
+  .report__subbar {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .report__footer {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

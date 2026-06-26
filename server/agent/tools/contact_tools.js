@@ -115,12 +115,14 @@ export default function registerContactTools(registry, { TrackedContact, Client 
     description: "Update a tracked contact's name / email / phone.",
     creditCost: 1,
     sensitive: true,
-    buildDescription: (a) => {
+    buildDescription: async (a, ctx) => {
       const changes = Object.entries(a)
         .filter(([k, v]) => k !== "contactId" && v !== undefined)
         .map(([k, v]) => `**${k}** → ${v}`)
         .join(", ");
-      return `Update contact \`${a.contactId}\`: ${changes || "no changes"}?`;
+      const c = await TrackedContact.findOne({ _id: a.contactId, userId: ctx?.userId }).select("name").lean().catch(() => null);
+      const label = c ? `**${c.name}**` : `contact \`${a.contactId}\``;
+      return `Update ${label}: ${changes || "no changes"}?`;
     },
     schema: z.object({
       contactId: z.string(),
@@ -155,7 +157,11 @@ export default function registerContactTools(registry, { TrackedContact, Client 
     description: "Permanently delete a tracked contact. Does NOT delete the underlying client (if any).",
     creditCost: 2,
     sensitive: true,
-    buildDescription: (a) => `Delete tracked contact \`${a.contactId}\` — proceed?`,
+    buildDescription: async (a, ctx) => {
+      const c = await TrackedContact.findOne({ _id: a.contactId, userId: ctx?.userId }).select("name email").lean().catch(() => null);
+      const label = c ? `**${c.name}**${c.email ? ` (${c.email})` : ""}` : `contact \`${a.contactId}\``;
+      return `Delete tracked contact ${label} — proceed?`;
+    },
     schema: z.object({ contactId: z.string() }),
     handler: async ({ contactId }, userId) => {
       if (!mongoose.isValidObjectId(contactId)) throw new Error("Invalid contactId");

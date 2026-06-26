@@ -7,6 +7,20 @@ export interface ChatListItem {
   updatedAt: string;
 }
 
+/** Which agent the composer routes to. "sequences" = the constrained Sequences sub-agent. */
+export type CopilotMode = "copilot" | "sequences";
+
+export interface AttachedSequence {
+  id: string;
+  name: string;
+}
+
+interface OpenCopilotOpts {
+  mode?: CopilotMode;
+  sequenceId?: string;
+  sequenceName?: string;
+}
+
 interface CopilotChatState {
   activeChatId: string | null;
   setActiveChatId: (id: string | null) => void;
@@ -15,6 +29,16 @@ interface CopilotChatState {
   createNewChat: () => Promise<string | null>;
   deleteChat: (id: string) => Promise<void>;
   renameChat: (id: string, title: string) => Promise<void>;
+
+  // ─── Composer state, shared by the Copilot page + the floating bubble ───
+  mode: CopilotMode;
+  setMode: (m: CopilotMode) => void;
+  attachedSequence: AttachedSequence | null;
+  setAttachedSequence: (s: AttachedSequence | null) => void;
+  bubbleOpen: boolean;
+  setBubbleOpen: (open: boolean) => void;
+  /** Open the bubble with an optional mode + attached sequence (used by "Create with AI"). */
+  openCopilot: (opts?: OpenCopilotOpts) => void;
 }
 
 const CopilotChatCtx = createContext<CopilotChatState>({
@@ -25,6 +49,13 @@ const CopilotChatCtx = createContext<CopilotChatState>({
   createNewChat: async () => null,
   deleteChat: async () => {},
   renameChat: async () => {},
+  mode: "copilot",
+  setMode: () => {},
+  attachedSequence: null,
+  setAttachedSequence: () => {},
+  bubbleOpen: false,
+  setBubbleOpen: () => {},
+  openCopilot: () => {},
 });
 
 export function useCopilotChat() {
@@ -35,6 +66,19 @@ export function CopilotChatProvider({ children }: { children: React.ReactNode })
   const { token } = useAuth();
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  // Composer state (mode selector + attached sequence + bubble visibility).
+  const [mode, setMode] = useState<CopilotMode>("copilot");
+  const [attachedSequence, setAttachedSequence] = useState<AttachedSequence | null>(null);
+  const [bubbleOpen, setBubbleOpen] = useState(false);
+
+  const openCopilot = useCallback((opts?: OpenCopilotOpts) => {
+    setMode(opts?.mode ?? "sequences");
+    setAttachedSequence(
+      opts?.sequenceId ? { id: opts.sequenceId, name: opts.sequenceName || "this sequence" } : null,
+    );
+    setBubbleOpen(true);
+  }, []);
 
   const refreshChatList = useCallback(async () => {
     if (!token) return;
@@ -115,6 +159,13 @@ export function CopilotChatProvider({ children }: { children: React.ReactNode })
         createNewChat,
         deleteChat,
         renameChat,
+        mode,
+        setMode,
+        attachedSequence,
+        setAttachedSequence,
+        bubbleOpen,
+        setBubbleOpen,
+        openCopilot,
       }}
     >
       {children}

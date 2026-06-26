@@ -23,9 +23,14 @@ import createWebhooksRouter from "./routes/webhooks.js";
 import createMessagesRouter from "./routes/messages.js";
 import createContactsRouter from "./routes/contacts.js";
 import createDashboardRouter from "./routes/dashboard.js";
+import createSearchRouter from "./routes/search.js";
 import createAgentRouter from "./routes/agent.js";
 import createAdminRouter from "./routes/admin.js";
+import createBillingRouter from "./routes/billing.js";
+import { handleWebhook, isBillingConfigured } from "./billing/billingService.js";
+import { BillingError } from "./billing/errors.js";
 import { buildAgentGraph } from "./agent/graph.js";
+import { buildSequenceAgentGraph } from "./sequences/agent/graph.js";
 import authMiddleware from "./middleware/auth.js";
 import createAdminAuth from "./middleware/adminAuth.js";
 import sequenceSchema from "./models/Sequence.js";
@@ -34,6 +39,10 @@ import sequenceEventSchema from "./models/SequenceEvent.js";
 import sequenceSettingsSchema from "./models/SequenceSettings.js";
 import notificationSchema from "./models/Notification.js";
 import documentRequestSchema from "./models/DocumentRequest.js";
+import activitySchema from "./models/Activity.js";
+import adminAuditSchema from "./models/AdminAudit.js";
+import { initActivityLog } from "./utils/activityLog.js";
+import { initAdminAudit } from "./utils/adminAudit.js";
 import createSequencesRouter from "./routes/sequences.js";
 import { startScheduler } from "./sequences/scheduler.js";
 import { tick as sequenceTick } from "./sequences/engine.js";
@@ -115,6 +124,16 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Admin panel sees very low legitimate traffic — a tight limit throttles
+// probing/brute-force against the admin surface without affecting normal users.
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, // generous for a single admin, restrictive for an attacker
+  message: { error: "Too many admin requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
 app.use("/api/auth/google", authLimiter);
@@ -126,7 +145,12 @@ app.use("/api/", (req, res, next) => {
   return apiLimiter(req, res, next);
 });
 
-app.use(express.json({ limit: "1mb" }));
+// The billing webhook needs the RAW body for signature verification — exempt that
+// one path from JSON parsing; the route below re-parses it with express.raw().
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/webhooks/billing") return next();
+  return express.json({ limit: "1mb" })(req, res, next);
+});
 
 const __filename_early = fileURLToPath(import.meta.url);
 const __dirname_early = path.dirname(__filename_early);
@@ -180,6 +204,14 @@ async function start() {
     const SequenceSettings = clientsConn.model("SequenceSettings", sequenceSettingsSchema, "SequenceSettings");
     const Notification = clientsConn.model("Notification", notificationSchema, "Notifications");
     const DocumentRequest = clientsConn.model("DocumentRequest", documentRequestSchema, "DocumentRequests");
+
+    // ─── Activity log (dashboard "Recent Activity" feed) ───
+    const Activity = clientsConn.model("Activity", activitySchema, "Activities");
+    initActivityLog(Activity);
+
+    // ─── Admin audit trail (security record, separate from the user feed) ───
+    const AdminAudit = clientsConn.model("AdminAudit", adminAuditSchema, "AdminAudits");
+    initAdminAudit(AdminAudit);
     // The `models` bag the engine + triggers consume.
     const sequenceModels = {
       Sequence, SequenceEnrollment, SequenceEvent, SequenceSettings, Notification, DocumentRequest,
@@ -237,11 +269,16 @@ async function start() {
 
     app.use("/api/messages", authMiddleware, createMessagesRouter(Connection, Message, TrackedContact, Client, sequenceModels));
     app.use("/api/contacts", authMiddleware, createContactsRouter(TrackedContact, Client));
-    app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User));
+    app.use("/api/dashboard", authMiddleware, createDashboardRouter(Client, TrackedContact, User, Sequence, Message, SequenceEvent, Activity));
+
+    // ─── Universal Search (header command palette) ───
+    app.use("/api/search", authMiddleware, createSearchRouter({ Client, InventoryItem, Message, TrackedContact, Sequence }));
 
     // ─── Admin Panel ───
+    // adminLimiter runs before auth so brute-force probing is throttled even on
+    // rejected (401/403) requests.
     const adminAuth = createAdminAuth(User);
-    app.use("/api/admin", adminAuth, createAdminRouter(User, CreditAccount));
+    app.use("/api/admin", adminLimiter, adminAuth, createAdminRouter(User, CreditAccount, AdminAudit));
 
     // ─── AI Copilot Agent ───
     // Sequence models are included so the copilot's create/update-client tools can fire triggers.
@@ -250,7 +287,35 @@ async function start() {
       ...sequenceModels,
     };
     const agentGraph = buildAgentGraph(allModels);
-    app.use("/api/agent", authMiddleware, createAgentRouter(agentGraph, allModels, inventoryBucket));
+    // The constrained Sequences sub-agent — same chat engine, its own tools + prompt.
+    // Selected per request via `mode: "sequences"` on /api/agent/chat.
+    const sequenceAgent = buildSequenceAgentGraph(allModels);
+    app.use("/api/agent", authMiddleware, createAgentRouter(
+      { copilot: agentGraph, sequences: sequenceAgent },
+      allModels,
+      inventoryBucket,
+    ));
+
+    // ─── Billing (provider-agnostic: Stripe / Dodo / …) ───
+    // Webhook FIRST: no JWT (the provider calls it), raw body for signature
+    // verification. Path is already exempt from the JSON parser (above) and the rate
+    // limiter (/webhooks prefix). The active provider verifies + normalizes the event;
+    // handleWebhook reconciles it → applyPlanChange.
+    app.post("/api/webhooks/billing", express.raw({ type: "*/*" }), async (req, res) => {
+      if (!isBillingConfigured()) return res.status(503).end();
+
+      try {
+        // Verify signature first (throws BillingError 400 on a bad signature) before acking.
+        await handleWebhook(allModels, req.body, req.headers);
+        res.json({ received: true });
+      } catch (err) {
+        const status = err instanceof BillingError ? err.status : 500;
+        if (status >= 500) console.error("⚠️ Billing webhook handler error:", err.message);
+        res.status(status).send(err.message);
+      }
+    });
+
+    app.use("/api/billing", authMiddleware, createBillingRouter(allModels));
 
     // ─── Sequences Engine (durable engine + REST API + scheduler + secret-gated /tick) ───
     // External backup clock (cronjob.org). Secret-gated; no JWT, like webhooks. Registered

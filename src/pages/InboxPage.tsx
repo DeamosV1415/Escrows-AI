@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import * as XLSX from "xlsx";
 import "./InboxPage.css";
@@ -123,6 +124,9 @@ const InboxPage: React.FC = () => {
   const [channelFilter, setChannelFilter] = useState<Channel | "all">("all");
   const [showUnread, setShowUnread] = useState(false);
   const [activeChat, setActiveChat] = useState<string | null>(null);
+  // Conversation id requested by the global header search, opened once it loads.
+  const [pendingConvId, setPendingConvId] = useState<string | null>(null);
+  const location = useLocation();
   const [replyText, setReplyText] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -588,6 +592,25 @@ const InboxPage: React.FC = () => {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [fetchConnectionStatus]);
+
+  /* ─── Deep-link from the global header search ─── */
+  useEffect(() => {
+    const state = location.state as { conversationId?: string; search?: string } | null;
+    if (!state) return;
+    if (state.search) setSearch(state.search);
+    if (state.conversationId) setPendingConvId(state.conversationId);
+    window.history.replaceState({}, ""); // don't re-apply on refresh
+  }, [location.state]);
+
+  // Open the requested conversation once it has loaded into the list.
+  useEffect(() => {
+    if (!pendingConvId) return;
+    if (conversations.some((c) => c.id === pendingConvId)) {
+      openChat(pendingConvId);
+      setPendingConvId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingConvId, conversations]);
 
   /* ─── Listen for header button events ─── */
   useEffect(() => {

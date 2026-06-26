@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "./DashboardPage.css";
 import { authFetch } from "../utils/authFetch";
+import GetStartedChecklist from "../components/dashboard/GetStartedChecklist";
 
 /* ─── Types ─── */
 interface DashboardData {
@@ -8,6 +10,7 @@ interface DashboardData {
     activeLeads: number;
     hotLeads: number;
     trackedContacts: number;
+    sequencesRunning: number;
   };
   hotLeadsList: {
     _id: string;
@@ -27,6 +30,47 @@ interface DashboardData {
   pipeline: { stage: string; count: number }[];
   userName: string;
 }
+
+type ActivityKind = "client" | "inventory" | "inbox" | "sequence";
+
+interface ActivityChange {
+  field: string;
+  label: string;
+  from: string | null;
+  to: string | null;
+}
+
+interface ActivityItem {
+  id: string;
+  kind: ActivityKind;
+  title: string;
+  changes?: ActivityChange[];
+  ai?: boolean;
+  at: string;
+}
+
+interface WeeklyDay {
+  label: string;
+  date: string;
+  client: number;
+  inventory: number;
+  inbox: number;
+  sequence: number;
+  total: number;
+}
+
+interface WeeklyData {
+  days: WeeklyDay[];
+  max: number;
+}
+
+/* Category order, labels and colours for the Weekly Activity stacked bars. */
+const WEEKLY_CATEGORIES: { key: ActivityKind; label: string; color: string }[] = [
+  { key: "client", label: "Clients", color: "var(--olive-500, #6b8035)" },
+  { key: "inbox", label: "Inbox", color: "#2f6fd0" },
+  { key: "sequence", label: "Sequences", color: "#6b5ea0" },
+  { key: "inventory", label: "Inventory", color: "#b8860b" },
+];
 
 const STAGE_COLORS: Record<string, string> = {
   Lead: "var(--olive-400, #8a9a4a)",
@@ -107,25 +151,78 @@ const ActionIcon = ({ type }: { type: string }) => {
   return icons[type] || icons.task;
 };
 
-const ComingSoonPlaceholder = ({
-  icon,
-  title,
-}: {
-  icon: string;
-  title: string;
-}) => (
-  <div className="dash__coming-soon">
-    <span className="dash__coming-soon-icon">{icon}</span>
-    <span className="dash__coming-soon-title">{title}</span>
-    <span className="dash__coming-soon-label">Coming Soon</span>
-  </div>
-);
-
 /* ─── Page ─── */
 
+/* Line-art icon per activity kind. */
+const ActivityIcon = ({ kind }: { kind: ActivityKind }) => {
+  const common = {
+    width: 17,
+    height: 17,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (kind) {
+    case "client":
+      return (
+        <svg {...common}>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      );
+    case "inbox":
+      return (
+        <svg {...common}>
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <polyline points="22,6 12,13 2,6" />
+        </svg>
+      );
+    case "inventory":
+      return (
+        <svg {...common}>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+        </svg>
+      );
+    case "sequence":
+      // Connected-node flow graph — represents a sequence's block graph.
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="2.4" />
+          <circle cx="18" cy="6" r="2.4" />
+          <circle cx="12" cy="18" r="2.4" />
+          <path d="M8 7.4l3 8.4M16 7.4l-3 8.4M8.4 6h7.2" />
+        </svg>
+      );
+  }
+};
+
 const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<ActivityItem[] | null>(null);
+  const [weekly, setWeekly] = useState<WeeklyData | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const handleClearActivity = async () => {
+    setClearing(true);
+    try {
+      const res = await authFetch("/api/dashboard/activity/clear", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to clear activity");
+      setActivity([]);
+      setShowClearConfirm(false);
+    } catch (err) {
+      console.error("Clear activity error:", err);
+    } finally {
+      setClearing(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -140,7 +237,34 @@ const DashboardPage: React.FC = () => {
         setLoading(false);
       }
     };
+
+    const fetchActivity = async () => {
+      try {
+        const res = await authFetch("/api/dashboard/activity");
+        if (!res.ok) throw new Error("Failed to fetch activity");
+        const json = await res.json();
+        setActivity(json.items || []);
+      } catch (err) {
+        console.error("Activity fetch error:", err);
+        setActivity([]);
+      }
+    };
+
+    const fetchWeekly = async () => {
+      try {
+        const res = await authFetch("/api/dashboard/weekly");
+        if (!res.ok) throw new Error("Failed to fetch weekly activity");
+        const json = await res.json();
+        setWeekly(json);
+      } catch (err) {
+        console.error("Weekly activity fetch error:", err);
+        setWeekly({ days: [], max: 1 });
+      }
+    };
+
     fetchDashboard();
+    fetchActivity();
+    fetchWeekly();
   }, []);
 
   /* ─── Time helper ─── */
@@ -186,11 +310,10 @@ const DashboardPage: React.FC = () => {
         },
         {
           label: "Sequences Running",
-          value: "—",
-          sublabel: "coming soon",
+          value: String(data.stats.sequencesRunning),
+          sublabel: "active sequences",
           color: "teal",
           trend: "up" as const,
-          comingSoon: true,
         },
         {
           label: "Tracked Contacts",
@@ -249,7 +372,10 @@ const DashboardPage: React.FC = () => {
           </p>
         </div>
         <div className="dash__welcome-actions">
-          <button className="dash__export-btn">
+          <button
+            className="dash__export-btn"
+            onClick={() => navigate("/dashboard/report")}
+          >
             <svg
               width="16"
               height="16"
@@ -269,20 +395,24 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Onboarding activation checklist — hides itself when complete or dismissed */}
+      <GetStartedChecklist
+        clientsCount={data.stats.activeLeads}
+        sequencesRunning={data.stats.sequencesRunning}
+      />
+
       {/* Stats Cards */}
       <div className="dash__stats">
         {statsCards.map((card) => (
           <div
             key={card.label}
-            className={`dash__stat-card dash__stat-card--${card.color} ${card.comingSoon ? "dash__stat-card--muted" : ""}`}
+            className={`dash__stat-card dash__stat-card--${card.color}`}
           >
             <div className="dash__stat-header">
               <span className="dash__stat-label">{card.label}</span>
-              {!card.comingSoon && <TrendArrow direction={card.trend} />}
+              <TrendArrow direction={card.trend} />
             </div>
-            <div className="dash__stat-value">
-              {card.comingSoon ? "—" : card.value}
-            </div>
+            <div className="dash__stat-value">{card.value}</div>
             <div className="dash__stat-footer">
               <span className="dash__stat-sublabel">{card.sublabel}</span>
             </div>
@@ -306,9 +436,7 @@ const DashboardPage: React.FC = () => {
             {data.hotLeadsList.length === 0 ? (
               <div className="dash__empty-state">
                 <span>No hot leads yet</span>
-                <p>
-                  Mark a client's intent as "Hot" to see them here.
-                </p>
+                <p>Mark a client's intent as "Hot" to see them here.</p>
               </div>
             ) : (
               data.hotLeadsList.map((lead) => {
@@ -348,9 +476,7 @@ const DashboardPage: React.FC = () => {
                           <circle cx="12" cy="12" r="10" />
                           <polyline points="12 6 12 12 16 14" />
                         </svg>
-                        <span>
-                          {lead.nextAction || "No action set"}
-                        </span>
+                        <span>{lead.nextAction || "No action set"}</span>
                         <span className="dash__lead-days">
                           {days === 0 ? "Today" : `${days}d ago`}
                         </span>
@@ -375,16 +501,12 @@ const DashboardPage: React.FC = () => {
             {data.nextActionsList.length === 0 ? (
               <div className="dash__empty-state">
                 <span>No actions pending</span>
-                <p>
-                  Add a "Next Action" to a client to track follow-ups here.
-                </p>
+                <p>Add a "Next Action" to a client to track follow-ups here.</p>
               </div>
             ) : (
               data.nextActionsList.map((action) => (
                 <div key={action._id} className="dash__action">
-                  <div
-                    className={`dash__action-icon dash__action-icon--task`}
-                  >
+                  <div className={`dash__action-icon dash__action-icon--task`}>
                     <ActionIcon type="task" />
                   </div>
                   <div className="dash__action-info">
@@ -446,19 +568,82 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Weekly Activity Chart — Coming Soon */}
+        {/* Weekly Activity Chart */}
         <div className="dash__panel dash__chart">
           <div className="dash__panel-header">
             <div>
               <h2 className="dash__panel-title">Weekly Activity</h2>
-              <p className="dash__panel-desc">Emails, calls & meetings</p>
+              <p className="dash__panel-desc">
+                Clients, inbox, sequences & inventory
+              </p>
             </div>
           </div>
-          <ComingSoonPlaceholder icon="📊" title="Activity tracking" />
+
+          {weekly === null ? (
+            <div className="dash__chart-loading">
+              <div className="loading-wave">
+                <div className="loading-bar" />
+                <div className="loading-bar" />
+                <div className="loading-bar" />
+                <div className="loading-bar" />
+              </div>
+            </div>
+          ) : weekly.days.every((d) => d.total === 0) ? (
+            <div className="dash__empty-state">
+              <span>No activity this week</span>
+              <p>Your activity across the last 7 days will chart here.</p>
+            </div>
+          ) : (
+            <>
+              <div className="dash__chart-bars">
+                {weekly.days.map((day) => (
+                  <div key={day.date} className="dash__chart-col">
+                    <div className="dash__chart-plot">
+                      <div
+                        className="dash__chart-stack"
+                        style={{
+                          height: `${(day.total / weekly.max) * 100}%`,
+                        }}
+                      >
+                        {day.total > 0 && (
+                          <span className="dash__chart-count">{day.total}</span>
+                        )}
+                        {WEEKLY_CATEGORIES.map((cat) =>
+                          day[cat.key] > 0 ? (
+                            <div
+                              key={cat.key}
+                              className="dash__chart-seg"
+                              style={{
+                                height: `${(day[cat.key] / day.total) * 100}%`,
+                                background: cat.color,
+                              }}
+                              title={`${cat.label}: ${day[cat.key]}`}
+                            />
+                          ) : null,
+                        )}
+                      </div>
+                    </div>
+                    <span className="dash__chart-label">{day.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="dash__chart-legend">
+                {WEEKLY_CATEGORIES.map((cat) => (
+                  <div key={cat.key} className="dash__chart-legend-item">
+                    <span
+                      className="dash__chart-legend-dot"
+                      style={{ background: cat.color }}
+                    />
+                    {cat.label}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Recent Activity Feed — Coming Soon */}
+      {/* Recent Activity Feed */}
       <div className="dash__panel dash__activity">
         <div className="dash__panel-header">
           <div>
@@ -467,9 +652,120 @@ const DashboardPage: React.FC = () => {
               Latest updates across your pipeline
             </p>
           </div>
+          {activity && activity.length > 0 && (
+            <button
+              className="dash__clear-btn"
+              onClick={() => setShowClearConfirm(true)}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              Clear
+            </button>
+          )}
         </div>
-        <ComingSoonPlaceholder icon="⚡" title="Activity feed" />
+        <div className="dash__activity-list">
+          {activity === null ? (
+            <div className="dash__activity-loading">
+              <div className="dash__spinner" />
+            </div>
+          ) : activity.length === 0 ? (
+            <div className="dash__empty-state">
+              <span>No activity yet</span>
+              <p>
+                Actions across clients, inbox, sequences and inventory show up
+                here.
+              </p>
+            </div>
+          ) : (
+            activity.map((item) => (
+              <div key={item.id} className="dash__activity-item">
+                <span
+                  className={`dash__activity-icon dash__activity-icon--${item.kind}`}
+                >
+                  <ActivityIcon kind={item.kind} />
+                </span>
+                <div className="dash__activity-content">
+                  <span className="dash__activity-text">
+                    {item.title}
+                    {item.ai && (
+                      <span className="dash__activity-ai" title="Performed by AI Copilot">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5 10.1 10.9 5.5 9l4.6-1.4L12 3z" />
+                        </svg>
+                        AI
+                      </span>
+                    )}
+                  </span>
+                  {item.changes && item.changes.length > 0 && (
+                    <div className="dash__activity-changes">
+                      {item.changes.map((c, i) => (
+                        <span key={i} className="dash__change-chip">
+                          <span className="dash__change-field">{c.label}</span>
+                          {c.from !== null && c.to !== null ? (
+                            <span className="dash__change-delta">
+                              {c.from}
+                              <span className="dash__change-arrow">→</span>
+                              {c.to}
+                            </span>
+                          ) : (
+                            <span className="dash__change-delta">updated</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="dash__activity-time">{timeAgo(item.at)}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      {/* Clear Activity confirmation dialog */}
+      {showClearConfirm && (
+        <div
+          className="dash__modal-overlay"
+          onClick={() => !clearing && setShowClearConfirm(false)}
+        >
+          <div className="dash__modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="dash__modal-title">Clear recent activity?</h3>
+            <p className="dash__modal-text">
+              This hides all current entries from your activity feed. Your
+              messages and sequence history are <b>not deleted</b>, and new
+              activity will still appear here.
+            </p>
+            <div className="dash__modal-actions">
+              <button
+                className="dash__modal-btn dash__modal-btn--ghost"
+                onClick={() => setShowClearConfirm(false)}
+                disabled={clearing}
+              >
+                Cancel
+              </button>
+              <button
+                className="dash__modal-btn dash__modal-btn--danger"
+                onClick={handleClearActivity}
+                disabled={clearing}
+              >
+                {clearing ? "Clearing..." : "Clear"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

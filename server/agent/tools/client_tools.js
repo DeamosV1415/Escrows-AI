@@ -1,6 +1,7 @@
 import { z } from "zod";
 import mongoose from "mongoose";
 import { enrollOnClientCreated, enrollOnStageChanged } from "../../sequences/triggers.js";
+import { logActivity } from "../../utils/activityLog.js";
 
 const STAGES  = ["Lead", "Engaged", "Under Contract", "Closed"];
 const INTENTS = ["hot", "warm", "cold"];
@@ -162,6 +163,15 @@ export default function registerClientTools(registry, models) {
       // Fire client_created sequence triggers (best-effort; mirrors the UI route).
       enrollOnClientCreated(models, client).catch(() => {});
 
+      // Record in the dashboard's Recent Activity, tagged as AI-performed.
+      logActivity({
+        userId,
+        category: "client",
+        action: "created",
+        title: `Added client ${client.name}`,
+        meta: { clientId: client._id, name: client.name, source: "ai" },
+      });
+
       return { success: true, client: projectClient(client.toObject()) };
     },
   });
@@ -172,12 +182,14 @@ export default function registerClientTools(registry, models) {
     description: "Update fields of an existing client. Pass clientId + only the fields to change. Syncs inventory folder name when name/company changes.",
     creditCost: 2,
     sensitive: true,
-    buildDescription: (a) => {
+    buildDescription: async (a, ctx) => {
       const changes = Object.entries(a)
         .filter(([k, v]) => k !== "clientId" && v !== undefined && v !== "")
         .map(([k, v]) => `**${k}** → ${v}`)
         .join(", ");
-      return `Update client (\`${a.clientId}\`): ${changes || "no changes"}?`;
+      const c = await Client.findOne({ _id: a.clientId, userId: ctx?.userId }).select("name").lean().catch(() => null);
+      const label = c ? `**${c.name}**` : `client \`${a.clientId}\``;
+      return `Update ${label}: ${changes || "no changes"}?`;
     },
     schema: z.object({
       clientId: z.string(),
@@ -232,6 +244,14 @@ export default function registerClientTools(registry, models) {
         ).catch(() => {});
       }
 
+      logActivity({
+        userId,
+        category: "client",
+        action: "updated",
+        title: `Updated ${client.name}`,
+        meta: { clientId: client._id, name: client.name, source: "ai" },
+      });
+
       return { success: true, client: projectClient(client) };
     },
   });
@@ -242,8 +262,11 @@ export default function registerClientTools(registry, models) {
     description: "Permanently delete a client AND all their inventory items AND their linked tracked contact. Cannot be undone.",
     creditCost: 3,
     sensitive: true,
-    buildDescription: (a) =>
-      `**Permanently delete** client \`${a.clientId}\` along with **all their inventory files/folders** and their tracked contact. This cannot be undone. Proceed?`,
+    buildDescription: async (a, ctx) => {
+      const c = await Client.findOne({ _id: a.clientId, userId: ctx?.userId }).select("name company").lean().catch(() => null);
+      const label = c ? `**${c.name}**${c.company ? ` (${c.company})` : ""}` : `client \`${a.clientId}\``;
+      return `**Permanently delete** ${label} along with **all their inventory files/folders** and their tracked contact. This cannot be undone. Proceed?`;
+    },
     schema: z.object({ clientId: z.string() }),
     handler: async ({ clientId }, userId, { gridfsBucket }) => {
       if (!mongoose.isValidObjectId(clientId)) throw new Error("Invalid clientId");
@@ -264,6 +287,14 @@ export default function registerClientTools(registry, models) {
 
       // Cascade: tracked contact
       await TrackedContact.deleteOne({ userId, clientRef: client._id }).catch(() => {});
+
+      logActivity({
+        userId,
+        category: "client",
+        action: "deleted",
+        title: `Deleted client ${client.name}`,
+        meta: { name: client.name, source: "ai" },
+      });
 
       return {
         success: true,

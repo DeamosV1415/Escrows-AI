@@ -32,12 +32,27 @@ export async function repliedSince(models, client, since) {
   return !!m;
 }
 
+/**
+ * Does this graph explicitly handle replies? A `wait_for_reply` block or a `condition` on
+ * the `replied` field means the sequence routes replies itself (Replied/Timeout branches).
+ * When it does, the blunt global `stopOnReply` net must step aside — otherwise it would
+ * terminate the enrollment the instant a reply arrives and the block's "Replied" branch
+ * could never run. `stopOnReply` therefore only protects drip sequences that have no such
+ * block of their own.
+ */
+export function sequenceHandlesReplies(graph) {
+  const nodes = graph?.nodes || [];
+  return nodes.some(
+    (n) => n.type === "wait_for_reply" || (n.type === "condition" && n.config?.field === "replied"),
+  );
+}
+
 /** Should this enrollment stop entirely? Checked at execution time, every step. */
 export async function shouldHalt(models, enrollment, client, settings) {
   if (enrollment.clientId && !client) return { halt: true, reason: "client_deleted" };
   if (client?.optedOut) return { halt: true, reason: "client_opted_out" };
   if (settings.stopOnClosed && client?.stage === "Closed") return { halt: true, reason: "deal_closed" };
-  if (settings.stopOnReply) {
+  if (settings.stopOnReply && !sequenceHandlesReplies(enrollment.graphSnapshot)) {
     const replied = await repliedSince(models, client, enrollment.enrolledAt);
     if (replied) return { halt: true, reason: "client_replied" };
   }

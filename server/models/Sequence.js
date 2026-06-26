@@ -59,6 +59,11 @@ const sequenceSchema = new mongoose.Schema(
     },
     version: { type: Number, default: 1 },
 
+    // Last time this sequence transitioned into "active". Used by the plan-cap sweep
+    // to keep the most-recently-activated sequences running when a downgrade forces
+    // auto-pausing the excess. null until first activated.
+    activatedAt: { type: Date, default: null },
+
     // Denormalized from the trigger node for fast "which sequences fire on X?" lookups.
     triggerType: {
       type: String,
