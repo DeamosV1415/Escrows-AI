@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { authFetch } from "../../utils/authFetch";
 import Sidebar from "./Sidebar";
 import ClientModal from "./ClientModal";
+import GlobalSearch from "./GlobalSearch";
+import { CopilotChatProvider } from "./CopilotChatContext";
+import ChatDropdown from "./ChatDropdown";
+import CopilotBubble from "./CopilotBubble";
+import WelcomeTour from "./WelcomeTour";
 import "./DashboardLayout.css";
 
 const DashboardLayout: React.FC = () => {
@@ -10,6 +15,34 @@ const DashboardLayout: React.FC = () => {
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const location = useLocation();
   const isInboxPage = location.pathname === "/dashboard/inbox";
+  const isCopilotPage = location.pathname === "/dashboard/copilot";
+
+  // Tell the backend which timezone this broker is in, so sequence quiet hours (and
+  // schedule/wait_until timing) are evaluated in their local time instead of UTC. Runs once
+  // per browser session, and only re-syncs if the detected zone changed.
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!tz) return;
+      if (sessionStorage.getItem("seqTzSynced") === tz) return;
+      authFetch("/api/sequences/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultTimezone: tz }),
+      })
+        .then((r) => { if (r.ok) sessionStorage.setItem("seqTzSynced", tz); })
+        .catch(() => {});
+    } catch {
+      /* timezone detection is best-effort */
+    }
+  }, []);
+
+  // Let the global search "＋ New Lead" quick action open the same modal as the header button.
+  useEffect(() => {
+    const onOpenNewLead = () => setNewLeadOpen(true);
+    window.addEventListener("open-new-lead", onOpenNewLead);
+    return () => window.removeEventListener("open-new-lead", onOpenNewLead);
+  }, []);
 
   const handleNewLead = async (data: Record<string, unknown>) => {
     const res = await authFetch("/api/clients", {
@@ -23,9 +56,9 @@ const DashboardLayout: React.FC = () => {
     window.dispatchEvent(new Event("client-updated"));
   };
 
-  return (
+  const content = (
     <div
-      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""}`}
+      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""}`}
     >
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -57,28 +90,15 @@ const DashboardLayout: React.FC = () => {
             </svg>
           </button>
 
-          {/* Search bar */}
-          <div className="dashboard-header__search">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search leads, contacts, deals..."
-              className="dashboard-header__search-input"
+          {/* Search bar OR Copilot title slot (filled by AgentChat via portal) */}
+          {isCopilotPage ? (
+            <div
+              id="copilot-title-slot"
+              className="dashboard-header__copilot-title"
             />
-            <kbd className="dashboard-header__search-kbd">⌘K</kbd>
-          </div>
+          ) : (
+            <GlobalSearch />
+          )}
 
           {/* Right side */}
           <div className="dashboard-header__actions">
@@ -136,6 +156,14 @@ const DashboardLayout: React.FC = () => {
                   <span>Connect Apps</span>
                 </button>
               </>
+            ) : isCopilotPage ? (
+              <>
+                <ChatDropdown />
+                <div
+                  id="copilot-actions-slot"
+                  className="dashboard-header__copilot-actions"
+                />
+              </>
             ) : (
               <button
                 className="dashboard-header__add-btn"
@@ -173,8 +201,18 @@ const DashboardLayout: React.FC = () => {
           onSubmit={handleNewLead}
         />
       )}
+
+      {/* Floating copilot, remotely accessible on every page except the full Copilot page. */}
+      {!isCopilotPage && <CopilotBubble />}
+
+      {/* Post-onboarding welcome takeover + guided tour (self-hides unless triggered). */}
+      <WelcomeTour />
     </div>
   );
+
+  // The CopilotChatProvider now wraps the WHOLE dashboard (not just the copilot page) so the
+  // floating bubble and the full Copilot page share one conversation + composer state.
+  return <CopilotChatProvider>{content}</CopilotChatProvider>;
 };
 
 export default DashboardLayout;

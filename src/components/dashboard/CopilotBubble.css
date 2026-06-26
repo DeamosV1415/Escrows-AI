@@ -1,0 +1,128 @@
+/* ─── Floating Copilot bubble ───────────────────────────────────────────
+   A launcher FAB + a hovering chat window, available on every dashboard page
+   except the full Copilot page. Shares the global cream/olive theme. */
+
+.cbubble__fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  /* Solid bold gold — flat and confident, no glare. A whisper of gradient for depth. */
+  background: linear-gradient(145deg, #c8a253, #b07f34);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(150, 110, 45, 0.3), 0 2px 6px rgba(31, 27, 22, 0.18);
+  z-index: 120;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, opacity 0.18s;
+}
+.cbubble__fab:hover {
+  transform: translateY(-2px) scale(1.05);
+  background: linear-gradient(145deg, #d0aa5b, #b8873b);
+  box-shadow: 0 12px 26px rgba(150, 110, 45, 0.4), 0 3px 8px rgba(31, 27, 22, 0.2);
+}
+.cbubble__fab:active { transform: scale(0.96); }
+.cbubble__fab--hidden { opacity: 0; transform: scale(0.4); pointer-events: none; }
+
+/* The window */
+.cbubble__panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  height: 640px;
+  max-height: calc(100vh - 110px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(31, 27, 22, 0.30);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 121;
+  transform-origin: bottom right;
+  will-change: transform, opacity;
+  /* closed state */
+  opacity: 0;
+  transform: translateY(12px) scale(0.965);
+  pointer-events: none;
+  /* gentle, smooth (no bounce) — matches the soft feel of a polished chat bubble */
+  transition: opacity 0.22s ease, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cbubble__panel--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Header */
+.cbubble__header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px 9px 12px;
+  border-bottom: 1px solid var(--border-light);
+  background: color-mix(in srgb, var(--gold-accent) 7%, var(--bg-card));
+  flex-shrink: 0;
+}
+.cbubble__title-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--gold-accent) 16%, transparent);
+  color: var(--gold-accent);
+}
+.cbubble__mode {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--gold-accent) 16%, transparent); color: var(--gold-accent);
+}
+.cbubble__header-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+
+/* Compact the reused ChatDropdown so it reads as a header switcher, not a boxed control. */
+.cbubble__header .chat-dropdown {
+  flex: 1; min-width: 0; max-width: none;
+  border: none; background: transparent; min-height: 0;
+}
+.cbubble__header .chat-dropdown:hover { background: transparent; }
+.cbubble__header .chat-dropdown__trigger { padding: 5px 6px; gap: 6px; }
+.cbubble__header .chat-dropdown__trigger-title { font-size: 13px; font-weight: 600; }
+.cbubble__header .chat-dropdown__trigger-new { width: 24px; height: 24px; }
+.cbubble__hbtn {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: none; background: transparent; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cbubble__hbtn:hover { background: #f0ece4; color: var(--text-primary); }
+
+/* Body hosts <AgentChat variant="bubble"> which fills via .copilot { height:100% } */
+.cbubble__body { flex: 1; min-height: 0; display: flex; }
+
+/* Tighten + shrink the chat surface inside the smaller bubble so it doesn't feel cramped. */
+.copilot--bubble .copilot__messages { padding: 18px 14px 12px; scroll-behavior: smooth; }
+.copilot--bubble .copilot__welcome { padding: 26px 10px; }
+.copilot--bubble .copilot__welcome-title { font-size: 1.3rem; }
+.copilot--bubble .copilot__welcome-desc { font-size: 0.82rem; }
+
+/* Smaller body text — the default size felt oversized in the narrow window. */
+.copilot--bubble .copilot__msg-bubble { font-size: 0.85rem; line-height: 1.55; }
+.copilot--bubble .copilot__msg-avatar { width: 28px; height: 28px; }
+.copilot--bubble .copilot__activity-text { font-size: 0.82rem; }
+.copilot--bubble .copilot__input { font-size: 0.86rem; }
+.copilot--bubble .copilot__input-area { padding: 12px 14px 14px; }
+.copilot--bubble .copilot__input-hint { font-size: 0.64rem; margin-top: 8px; }
+.copilot--bubble .copilot__chips { margin-bottom: 7px; }
+
+@media (max-width: 560px) {
+  .cbubble__panel {
+    right: 12px; bottom: 12px; left: 12px;
+    width: auto; height: calc(100vh - 88px); max-height: none;
+  }
+  .cbubble__fab { right: 16px; bottom: 16px; }
+}

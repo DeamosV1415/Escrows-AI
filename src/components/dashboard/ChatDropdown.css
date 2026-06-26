@@ -1,0 +1,332 @@
+/* ─── Chat Dropdown (Copilot header) ──────────────────────────────────
+   Cream/olive theme, matched to the rest of the dashboard. */
+
+.chat-dropdown {
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 40px;
+  background-color: var(--bg-secondary);
+  position: relative;
+  inset-inline: auto;
+  max-width: 380px;
+  min-width: 320px;
+  flex: 1;
+  transition: all var(--transition-fast);
+}
+.chat-dropdown:hover { background-color: #fff; border-color: var(--olive-200); }
+
+.chat-dropdown input.chat-dropdown__state:where(:checked) ~ .chat-dropdown__list {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: auto;
+  visibility: visible;
+}
+.chat-dropdown input.chat-dropdown__state:where(:not(:checked)) ~ .chat-dropdown__list {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  pointer-events: none;
+  visibility: hidden;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Trigger */
+.chat-dropdown__trigger {
+  cursor: pointer;
+  list-style: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  font-weight: 500;
+  color: var(--text-primary);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-flow: row;
+  gap: 10px;
+  padding: 8px 12px;
+  height: max-content;
+  position: relative;
+  z-index: 99;
+  border-radius: inherit;
+  background-color: transparent;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  transition: background var(--transition-fast);
+}
+.chat-dropdown__trigger:hover { background-color: rgba(255, 255, 255, 0.6); }
+
+.chat-dropdown__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.chat-dropdown input.chat-dropdown__state:where(:checked) + .chat-dropdown__trigger {
+  background-color: #fff;
+}
+.chat-dropdown input.chat-dropdown__state:where(:checked) + .chat-dropdown__trigger .chat-dropdown__chevron {
+  transform: rotate(180deg);
+  color: var(--olive-700);
+}
+
+.chat-dropdown__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chat-dropdown__trigger-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.chat-dropdown__trigger-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+.chat-dropdown__trigger-new:hover {
+  background: var(--olive-100);
+  color: var(--olive-700);
+  border-color: var(--olive-300);
+}
+
+/* List — cream overlay with glassmorphism */
+.chat-dropdown__list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* Search bar inside dropdown */
+.chat-dropdown__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+.chat-dropdown__search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: flex;
+}
+.chat-dropdown__search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  padding: 4px 0;
+}
+.chat-dropdown__search-input::placeholder { color: var(--text-muted); }
+
+/* Scrollable list */
+.chat-dropdown__items {
+  max-height: 20rem;
+  overflow: hidden auto;
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-dropdown__items::-webkit-scrollbar { width: 6px; }
+.chat-dropdown__items::-webkit-scrollbar-track { background: transparent; }
+.chat-dropdown__items::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; }
+.chat-dropdown__items:hover::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); }
+
+/* Chat item */
+.chat-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-primary);
+  position: relative;
+}
+.chat-dropdown__item:hover { background: var(--bg-secondary); }
+.chat-dropdown__item--active {
+  background: var(--olive-100);
+  color: var(--olive-900);
+}
+.chat-dropdown__item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--olive-600), var(--olive-800));
+}
+
+.chat-dropdown__item-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+.chat-dropdown__item--active .chat-dropdown__item-icon {
+  background: linear-gradient(135deg, #fff, var(--olive-100));
+  color: var(--olive-700);
+  border-color: var(--olive-200);
+}
+
+.chat-dropdown__item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-dropdown__item-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-dropdown__item-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* Actions (visible on hover) */
+.chat-dropdown__item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.chat-dropdown__item:hover .chat-dropdown__item-actions { opacity: 1; }
+.chat-dropdown__item-action {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s;
+}
+.chat-dropdown__item-action:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+.chat-dropdown__item-action--delete:hover {
+  color: #a83c3c;
+  background: rgba(168, 60, 60, 0.08);
+}
+
+/* Rename inline input */
+.chat-dropdown__rename-input {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--olive-300);
+  border-radius: 5px;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  padding: 3px 6px;
+}
+
+/* Empty state */
+.chat-dropdown__empty {
+  padding: 20px 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+/* New chat button inside list */
+.chat-dropdown__new-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px dashed var(--border-medium);
+  background: transparent;
+  width: calc(100% - 12px);
+  margin: 2px 6px 4px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+.chat-dropdown__new-btn:hover {
+  background: var(--olive-100);
+  color: var(--olive-800);
+  border-color: var(--olive-300);
+}
+
+@media (max-width: 720px) {
+  .chat-dropdown {
+    min-width: 240px;
+    max-width: 100%;
+  }
+}

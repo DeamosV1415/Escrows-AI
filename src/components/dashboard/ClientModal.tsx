@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
 import "./ClientModal.css";
 
+interface Transaction {
+  status?: string;
+  contractDate?: string | null;
+  inspectionDate?: string | null;
+  appraisalDate?: string | null;
+  loanContingencyDate?: string | null;
+  closingDate?: string | null;
+}
+
 interface ClientData {
   _id?: string;
   name: string;
@@ -14,7 +23,19 @@ interface ClientData {
   nextAction: string;
   nextActionPriority: "high" | "medium" | "low";
   notes: string;
+  transaction?: Transaction;
 }
+
+const TXN_STATUSES = ["none", "active", "inspection", "appraisal", "loan", "clear_to_close", "closed"];
+const TXN_DATES: { key: keyof Transaction; label: string }[] = [
+  { key: "contractDate", label: "Contract date" },
+  { key: "inspectionDate", label: "Inspection date" },
+  { key: "appraisalDate", label: "Appraisal date" },
+  { key: "loanContingencyDate", label: "Loan contingency" },
+  { key: "closingDate", label: "Closing date" },
+];
+// ISO/date string → "YYYY-MM-DD" for <input type="date">; empty otherwise.
+const toDateInput = (v?: string | null) => (v ? new Date(v).toISOString().slice(0, 10) : "");
 
 interface ClientModalProps {
   client?: ClientData;
@@ -41,6 +62,7 @@ const defaultForm: ClientData = {
   nextAction: "",
   nextActionPriority: "medium",
   notes: "",
+  transaction: { status: "none" },
 };
 
 const ClientModal: React.FC<ClientModalProps> = ({
@@ -85,6 +107,13 @@ const ClientModal: React.FC<ClientModalProps> = ({
     }));
   };
 
+  const handleTxnChange = (key: keyof Transaction, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      transaction: { ...(prev.transaction || {}), [key]: value },
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -123,7 +152,20 @@ const ClientModal: React.FC<ClientModalProps> = ({
 
     try {
       setSubmitting(true);
-      await onSubmit(form);
+      // Sanitize transaction dates: empty strings → null so Mongoose doesn't reject them.
+      const t = form.transaction || {};
+      const payload: Partial<ClientData> = {
+        ...form,
+        transaction: {
+          status: t.status || "none",
+          contractDate: t.contractDate || null,
+          inspectionDate: t.inspectionDate || null,
+          appraisalDate: t.appraisalDate || null,
+          loanContingencyDate: t.loanContingencyDate || null,
+          closingDate: t.closingDate || null,
+        },
+      };
+      await onSubmit(payload);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -309,6 +351,40 @@ const ClientModal: React.FC<ClientModalProps> = ({
               </select>
             </div>
           </div>
+
+          {/* Transaction / escrow tracking — relevant once a deal is under contract */}
+          {(form.stage === "Under Contract" || form.stage === "Closed") && (
+            <div className="client-modal__txn">
+              <div className="client-modal__txn-head">
+                <span>Transaction</span>
+                <select
+                  className="client-modal__input client-modal__select client-modal__txn-status"
+                  value={form.transaction?.status || "none"}
+                  onChange={(e) => handleTxnChange("status", e.target.value)}
+                >
+                  {TXN_STATUSES.map((s) => (
+                    <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="client-modal__txn-hint">
+                Deadline dates power Contract-to-Close reminders. Leave blank to skip a reminder.
+              </p>
+              <div className="client-modal__txn-grid">
+                {TXN_DATES.map((d) => (
+                  <div className="client-modal__field" key={d.key}>
+                    <label className="client-modal__label">{d.label}</label>
+                    <input
+                      type="date"
+                      className="client-modal__input"
+                      value={toDateInput(form.transaction?.[d.key])}
+                      onChange={(e) => handleTxnChange(d.key, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {error && <div className="client-modal__error">{error}</div>}
 

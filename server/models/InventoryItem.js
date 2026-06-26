@@ -21,8 +21,9 @@ const inventoryItemSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    storagePath: { type: String, default: "" },
-    gridfsFileId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    storagePath: { type: String, default: "" }, // legacy disk path (pre-GridFS)
+    gridfsFileId: { type: mongoose.Schema.Types.ObjectId, default: null }, // legacy GridFS
+    r2Key: { type: String, default: "" }, // Cloudflare R2 object key (current storage)
   },
   { timestamps: true },
 );

@@ -1,0 +1,202 @@
+/* Universal header search — wraps the existing .dashboard-header__search bar and
+   layers a command-palette dropdown beneath it. */
+
+.global-search {
+  position: relative;
+  flex: 1;
+  max-width: 480px;
+}
+
+/* Let the inner bar fill the wrapper (it keeps its own max-width otherwise). */
+.global-search__bar {
+  max-width: none;
+  width: 100%;
+}
+
+/* ─── Dropdown ─── */
+.global-search__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px;
+  animation: gs-fade 0.12s ease;
+}
+
+@keyframes gs-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Groups ─── */
+.global-search__group {
+  padding: 4px 0;
+}
+.global-search__group + .global-search__group {
+  border-top: 1px solid var(--border-light);
+}
+
+.global-search__group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.global-search__group-icon {
+  display: inline-flex;
+  color: var(--olive-400, #6a8035);
+}
+.global-search__see-all {
+  margin-left: auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--olive-400, #6a8035);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.global-search__see-all:hover { text-decoration: underline; }
+
+/* ─── Rows ─── */
+.global-search__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+}
+
+.global-search__row--active,
+.global-search__row:hover {
+  background: var(--bg-secondary);
+}
+
+.global-search__row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.global-search__row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1; /* push the delete button to the far right */
+}
+
+/* Per-recent delete (bin) — hidden until the row is hovered/active. */
+.global-search__row-delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.global-search__row:hover .global-search__row-delete,
+.global-search__row--active .global-search__row-delete {
+  opacity: 1;
+}
+.global-search__row-delete:hover {
+  color: #c44;
+  background: rgba(204, 68, 68, 0.1);
+}
+
+/* ─── Quick-action chips (compact horizontal row) ─── */
+.global-search__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 10px 4px;
+}
+.global-search__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.global-search__chip:hover {
+  border-color: var(--olive-300, #9bb06a);
+  background: #fff;
+}
+.global-search__row-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.global-search__row-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Status / footer ─── */
+.global-search__status {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.global-search__footer {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px 4px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.global-search__footer kbd {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-light);
+  margin-right: 3px;
+}
+
+@media (max-width: 768px) {
+  .global-search__footer { display: none; }
+}

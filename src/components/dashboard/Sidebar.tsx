@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
-import { authFetch } from "../../utils/authFetch";
 import "./Sidebar.css";
 import LogoImg from "../../assets/Logo.png";
 
@@ -10,103 +9,144 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-const navItems = [
+const ICON_DASHBOARD = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
+const ICON_CLIENTS = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 00-3-3.87" />
+    <path d="M16 3.13a4 4 0 010 7.75" />
+  </svg>
+);
+
+const ICON_INVENTORY = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+
+const ICON_SEQUENCES = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
+const ICON_COPILOT = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+  </svg>
+);
+
+const ICON_INBOX = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
+interface NavChild {
+  label: string;
+  path: string;
+  end?: boolean;
+}
+interface NavItem {
+  label: string;
+  path: string;
+  icon: React.ReactNode;
+  end?: boolean;
+  children?: NavChild[];
+}
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
   {
-    label: "Dashboard",
-    path: "/dashboard",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    ),
+    label: "Workspace",
+    items: [
+      { label: "Dashboard", path: "/dashboard", icon: ICON_DASHBOARD, end: true },
+      { label: "Clients", path: "/dashboard/clients", icon: ICON_CLIENTS },
+      { label: "Inventory", path: "/dashboard/inventory", icon: ICON_INVENTORY },
+    ],
   },
   {
-    label: "Clients",
-    path: "/dashboard/clients",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 00-3-3.87" />
-        <path d="M16 3.13a4 4 0 010 7.75" />
-      </svg>
-    ),
-  },
-  {
-    label: "Inventory",
-    path: "/dashboard/inventory",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-      </svg>
-    ),
-  },
-  {
-    label: "Sequences",
-    path: "/dashboard/sequences",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    ),
-  },
-  {
-    label: "Inbox",
-    path: "/dashboard/inbox",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-        <polyline points="22,6 12,13 2,6" />
-      </svg>
-    ),
+    label: "Engage",
+    items: [
+      {
+        label: "Sequences",
+        path: "/dashboard/sequences",
+        icon: ICON_SEQUENCES,
+        children: [
+          { label: "Sequences", path: "/dashboard/sequences", end: true },
+          { label: "Analytics", path: "/dashboard/sequences/analytics" },
+        ],
+      },
+      { label: "Inbox", path: "/dashboard/inbox", icon: ICON_INBOX },
+      { label: "AI Copilot", path: "/dashboard/copilot", icon: ICON_COPILOT },
+    ],
   },
 ];
 
@@ -133,34 +173,16 @@ const bottomItems = [
 ];
 
 /* ─── Profile Popup ─── */
-interface ProfileData {
-  phone: string;
-  company: string;
-  jobTitle: string;
-  licenseNumber: string;
-  yearsInBusiness: string;
-  location: string;
-  specialization: string;
-  teamSize: string;
-}
-
 const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
-  const { user, token, logout, updateUser } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [profileData, setProfileData] = useState<ProfileData>({
-    phone: "",
-    company: "",
-    jobTitle: "",
-    licenseNumber: "",
-    yearsInBusiness: "",
-    location: "",
-    specialization: "",
-    teamSize: "",
+  const location = useLocation();
+  const [seqOpen, setSeqOpen] = useState<boolean>(() => {
+    const stored = localStorage.getItem("sidebarSeqOpen");
+    return stored === null ? true : stored === "true";
   });
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // Close popup on outside click
@@ -168,7 +190,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         setPopupOpen(false);
-        setEditMode(false);
       }
     };
     if (popupOpen) document.addEventListener("mousedown", handler);
@@ -197,54 +218,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
-  // Load profile data when opening edit mode
-  const openEditMode = async () => {
-    setEditMode(true);
-    try {
-      const res = await authFetch("/api/auth/me");
-      const data = await res.json();
-      if (res.ok && data.user) {
-        setProfileData({
-          phone: data.user.phone || "",
-          company: data.user.company || "",
-          jobTitle: data.user.jobTitle || "",
-          licenseNumber: data.user.licenseNumber || "",
-          yearsInBusiness: data.user.yearsInBusiness?.toString() || "",
-          location: data.user.location || "",
-          specialization: data.user.specialization || "",
-          teamSize: data.user.teamSize || "",
-        });
-      }
-    } catch {
-      // silently fail, form will be empty
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await authFetch("/api/auth/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...profileData,
-          yearsInBusiness: profileData.yearsInBusiness
-            ? parseInt(profileData.yearsInBusiness)
-            : null,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        updateUser(data.user);
-        setEditMode(false);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleLogout = () => {
     logout();
     setPopupOpen(false);
@@ -264,8 +237,12 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
       ? `${userName.split(" ")[0]} ${userName.split(" ")[1]?.[0]}.`
       : userName;
 
-  const handleFieldChange = (field: keyof ProfileData, value: string) => {
-    setProfileData((prev) => ({ ...prev, [field]: value }));
+  const toggleSeq = () => {
+    setSeqOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebarSeqOpen", String(next));
+      return next;
+    });
   };
 
   return (
@@ -305,28 +282,117 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
 
       {/* Main navigation */}
       <nav className="sidebar__nav">
-        <div className="sidebar__nav-section">
-          <span className="sidebar__nav-label">{!collapsed && "MENU"}</span>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === "/dashboard"}
-              className={({ isActive }) =>
-                `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
+        {navSections.map((section) => (
+          <div key={section.label} className="sidebar__nav-section">
+            <span className="sidebar__nav-label">{section.label}</span>
+            {section.items.map((item) => {
+              // Grouped item (Sequences → Sequences + Analytics)
+              if (item.children) {
+                const groupActive = location.pathname.startsWith(item.path);
+
+                // Collapsed: icon link with a hover flyout listing children
+                if (collapsed) {
+                  return (
+                    <div key={item.path} className="sidebar__group sidebar__group--collapsed">
+                      <NavLink
+                        to={item.path}
+                        className={`sidebar__link ${groupActive ? "sidebar__link--active" : ""}`}
+                        title={item.label}
+                      >
+                        <span className="sidebar__link-icon">{item.icon}</span>
+                      </NavLink>
+                      <div className="sidebar__flyout">
+                        <span className="sidebar__flyout-title">{item.label}</span>
+                        {item.children.map((c) => (
+                          <NavLink
+                            key={c.path}
+                            to={c.path}
+                            end={c.end}
+                            className={({ isActive }) =>
+                              `sidebar__flyout-link ${isActive ? "sidebar__flyout-link--active" : ""}`
+                            }
+                          >
+                            {c.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Expanded: collapsible disclosure
+                return (
+                  <div key={item.path} className="sidebar__group">
+                    <button
+                      type="button"
+                      className={`sidebar__group-header ${groupActive ? "sidebar__group-header--active" : ""}`}
+                      onClick={toggleSeq}
+                      aria-expanded={seqOpen}
+                      data-tour="nav-sequences"
+                    >
+                      <span className="sidebar__link-icon">{item.icon}</span>
+                      <span className="sidebar__link-label">{item.label}</span>
+                      <svg
+                        className="sidebar__group-chevron"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                    <div className="sidebar__group-body" data-open={seqOpen}>
+                      <div className="sidebar__group-body-inner">
+                        {item.children.map((c) => (
+                          <NavLink
+                            key={c.path}
+                            to={c.path}
+                            end={c.end}
+                            className={({ isActive }) =>
+                              `sidebar__sublink ${isActive ? "sidebar__sublink--active" : ""}`
+                            }
+                          >
+                            {c.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
               }
-              title={collapsed ? item.label : undefined}
-            >
-              <span className="sidebar__link-icon">{item.icon}</span>
-              {!collapsed && (
-                <span className="sidebar__link-label">{item.label}</span>
-              )}
-              {!collapsed && item.label === "Inbox" && unreadCount > 0 && (
-                <span className="sidebar__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
-              )}
-            </NavLink>
-          ))}
-        </div>
+
+              const showBadge = item.label === "Inbox" && unreadCount > 0;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.end}
+                  data-tour={`nav-${item.path.split("/").pop() || "dashboard"}`}
+                  className={({ isActive }) =>
+                    `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
+                  }
+                  title={collapsed ? item.label : undefined}
+                >
+                  <span className="sidebar__link-icon">{item.icon}</span>
+                  {!collapsed && (
+                    <span className="sidebar__link-label">{item.label}</span>
+                  )}
+                  {!collapsed && showBadge && (
+                    <span className="sidebar__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                  )}
+                  {collapsed && showBadge && (
+                    <span className="sidebar__badge-dot" aria-hidden="true" />
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Bottom section */}
@@ -367,13 +433,13 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
             {!collapsed && (
               <div className="sidebar__user-info">
                 <span className="sidebar__user-name">{shortName}</span>
-                <span className="sidebar__user-role">{profileData.jobTitle || user?.email || "Member"}</span>
+                <span className="sidebar__user-role">{user?.email || "Member"}</span>
               </div>
             )}
           </div>
 
           {/* Context Menu (beside sidebar) */}
-          {popupOpen && !editMode && (
+          {popupOpen && (
             <div className="profile-menu">
               <div className="profile-menu__header">
                 {user?.avatar ? (
@@ -395,17 +461,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
               <div className="profile-menu__divider" />
 
               <button
-                className="profile-menu__btn"
-                onClick={openEditMode}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-                Edit Profile
-              </button>
-
-              <button
                 className="profile-menu__btn profile-menu__btn--logout"
                 onClick={handleLogout}
               >
@@ -416,136 +471,6 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                 </svg>
                 Sign Out
               </button>
-            </div>
-          )}
-
-          {/* Edit Profile Modal (centered full-screen) */}
-          {editMode && (
-            <div className="profile-modal-overlay">
-              <div className="profile-modal">
-                <div className="profile-modal__header">
-                  <div className="profile-modal__header-user">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={userName}
-                        className="profile-modal__avatar"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="profile-modal__avatar-initials">{initials}</div>
-                    )}
-                    <span className="profile-modal__title">Edit Profile</span>
-                  </div>
-                  <button
-                    className="profile-modal__close"
-                    onClick={() => {
-                      setEditMode(false);
-                      setPopupOpen(false);
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="profile-modal__content">
-                  <div className="profile-modal__grid">
-                    <div className="profile-field">
-                      <label>Phone</label>
-                      <input
-                        type="tel"
-                        value={profileData.phone}
-                        onChange={(e) => handleFieldChange("phone", e.target.value)}
-                        placeholder="+1 (555) 123-4567"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>Company</label>
-                      <input
-                        type="text"
-                        value={profileData.company}
-                        onChange={(e) => handleFieldChange("company", e.target.value)}
-                        placeholder="Your brokerage or firm"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>Job Title</label>
-                      <input
-                        type="text"
-                        value={profileData.jobTitle}
-                        onChange={(e) => handleFieldChange("jobTitle", e.target.value)}
-                        placeholder="e.g. Real Estate Agent"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>License Number</label>
-                      <input
-                        type="text"
-                        value={profileData.licenseNumber}
-                        onChange={(e) => handleFieldChange("licenseNumber", e.target.value)}
-                        placeholder="e.g. DRE-01234567"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>Location</label>
-                      <input
-                        type="text"
-                        value={profileData.location}
-                        onChange={(e) => handleFieldChange("location", e.target.value)}
-                        placeholder="City, State"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>Years in Business</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="99"
-                        value={profileData.yearsInBusiness}
-                        onChange={(e) => handleFieldChange("yearsInBusiness", e.target.value)}
-                        placeholder="e.g. 5"
-                      />
-                    </div>
-                    <div className="profile-field">
-                      <label>Specialization</label>
-                      <select
-                        value={profileData.specialization}
-                        onChange={(e) => handleFieldChange("specialization", e.target.value)}
-                      >
-                        <option value="">Select...</option>
-                        <option value="Residential">Residential</option>
-                        <option value="Commercial">Commercial</option>
-                        <option value="Land & Development">Land & Development</option>
-                        <option value="Property Management">Property Management</option>
-                        <option value="Mortgage & Lending">Mortgage & Lending</option>
-                        <option value="Title & Escrow">Title & Escrow</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <div className="profile-field">
-                      <label>Team Size</label>
-                      <select
-                        value={profileData.teamSize}
-                        onChange={(e) => handleFieldChange("teamSize", e.target.value)}
-                      >
-                        <option value="">Select...</option>
-                        <option value="Solo">Solo</option>
-                        <option value="2-5">2–5 people</option>
-                        <option value="6-20">6–20 people</option>
-                        <option value="20+">20+ people</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    className="profile-modal__save"
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </div>

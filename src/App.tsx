@@ -13,9 +13,13 @@ import Footer from "./components/Footer";
 import ThreeBackground from "./components/ThreeBackground";
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardPage from "./pages/DashboardPage";
+import ReportPage from "./pages/ReportPage";
 import ClientsPage from "./pages/ClientsPage";
 import InventoryPage from "./pages/InventoryPage";
 import SequencesPage from "./pages/SequencesPage";
+import SequenceBuilderPage from "./pages/SequenceBuilderPage";
+import SequenceAnalyticsPage from "./pages/SequenceAnalyticsPage";
+import CopilotPage from "./pages/CopilotPage";
 import InboxPage from "./pages/InboxPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
@@ -26,6 +30,8 @@ import AboutPage from "./components/AboutPage";
 import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
 import TermsOfServicePage from "./components/TermsOfServicePage";
 import CookiePolicyPage from "./components/CookiePolicyPage";
+import AdminProtectedRoute from "./components/AdminProtectedRoute";
+import AdminPage from "./pages/AdminPage";
 
 /* ─── Landing Page (public-facing site with shared layout) ─── */
 function LandingPage() {
@@ -108,6 +114,16 @@ function App() {
           {/* Onboarding profile form */}
           <Route path="/onboarding" element={<OnboardingPage />} />
 
+          {/* Admin Panel (standalone, email-gated) — obscured path for security */}
+          <Route
+            path="/riasxakeno"
+            element={
+              <AdminProtectedRoute>
+                <AdminPage />
+              </AdminProtectedRoute>
+            }
+          />
+
           {/* Dashboard (protected) */}
           <Route
             path="/dashboard"
@@ -121,9 +137,22 @@ function App() {
             <Route path="clients" element={<ClientsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="sequences" element={<SequencesPage />} />
+            <Route path="sequences/analytics" element={<SequenceAnalyticsPage />} />
+            <Route path="sequences/:id/edit" element={<SequenceBuilderPage />} />
+            <Route path="copilot" element={<CopilotPage />} />
             <Route path="inbox" element={<InboxPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
+
+          {/* Printable report (protected, standalone — no sidebar shell) */}
+          <Route
+            path="/dashboard/report"
+            element={
+              <ProtectedRoute>
+                <ReportPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Landing / public pages (catch-all) */}
           <Route path="/*" element={<LandingPage />} />

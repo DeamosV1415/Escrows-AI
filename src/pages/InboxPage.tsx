@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import * as XLSX from "xlsx";
 import "./InboxPage.css";
@@ -123,6 +124,9 @@ const InboxPage: React.FC = () => {
   const [channelFilter, setChannelFilter] = useState<Channel | "all">("all");
   const [showUnread, setShowUnread] = useState(false);
   const [activeChat, setActiveChat] = useState<string | null>(null);
+  // Conversation id requested by the global header search, opened once it loads.
+  const [pendingConvId, setPendingConvId] = useState<string | null>(null);
+  const location = useLocation();
   const [replyText, setReplyText] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -280,19 +284,58 @@ const InboxPage: React.FC = () => {
     if (!token || syncingRef.current) return;
     syncingRef.current = true;
     setSyncing(true);
+    // Never let the spinner hang on a slow/stalled Gmail call — bail after 30s.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       await fetch("/api/messages/sync", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       });
       await fetchConversations();
     } catch {
-      // silently fail
+      // silently fail (includes the 30s timeout abort)
     } finally {
+      clearTimeout(timeout);
       syncingRef.current = false;
       setSyncing(false);
     }
   }, [token, fetchConversations]);
+
+  /* ─── Load (or reload) the messages for one conversation ─── */
+  const loadMessages = useCallback(
+    async (id: string) => {
+      if (!token) return;
+      try {
+        const res = await fetch(`/api/messages/${encodeURIComponent(id)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const msgs = await res.json();
+          const mapped: Message[] = msgs.map((m: any) => ({
+            id: m._id,
+            text: m.body || "",
+            sent: m.direction === "outbound",
+            time: m.timestamp
+              ? new Date(m.timestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "",
+            subject: m.subject || undefined,
+            attachments: m.attachments || [],
+          }));
+          setConversations((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, messages: mapped } : c)),
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
     fetchConnectionStatus();
@@ -306,6 +349,50 @@ const InboxPage: React.FC = () => {
     const interval = setInterval(fetchConversations, 60000);
     return () => clearInterval(interval);
   }, [token, fetchConversations]);
+
+  /* ─── Pull fresh mail when the inbox opens ─── */
+  // The backend auto-syncs on its own clock every few minutes, so we only need a
+  // one-off pull on mount here. The manual "Sync" button (triggerSync) remains
+  // available for an on-demand pull.
+  useEffect(() => {
+    if (!token) return;
+    triggerSync();
+  }, [token, triggerSync]);
+
+  /* ─── Real-time updates via SSE (server pushes new messages live) ─── */
+  // Keep a ref to the open chat so the long-lived stream handler always sees the
+  // current value without resubscribing on every chat switch.
+  const activeChatRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  useEffect(() => {
+    if (!token) return;
+    const es = new EventSource(
+      `/api/messages/stream?token=${encodeURIComponent(token)}`,
+    );
+    es.onmessage = (e) => {
+      let evt: { type?: string; contactIdentifier?: string } = {};
+      try {
+        evt = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      if (evt.type !== "new-message") return;
+      // Refresh the conversation list (updates previews, ordering, unread badges).
+      fetchConversations();
+      // If the affected conversation is open, append the new message live.
+      if (evt.contactIdentifier && evt.contactIdentifier === activeChatRef.current) {
+        loadMessages(activeChatRef.current);
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 150);
+      }
+    };
+    // On error the browser auto-reconnects (honoring the server's `retry`).
+    return () => es.close();
+  }, [token, fetchConversations, loadMessages]);
 
   /* ─── Contacts CRUD ─── */
   const handleAddContact = async () => {
@@ -506,6 +593,25 @@ const InboxPage: React.FC = () => {
     return () => window.removeEventListener("message", handleMessage);
   }, [fetchConnectionStatus]);
 
+  /* ─── Deep-link from the global header search ─── */
+  useEffect(() => {
+    const state = location.state as { conversationId?: string; search?: string } | null;
+    if (!state) return;
+    if (state.search) setSearch(state.search);
+    if (state.conversationId) setPendingConvId(state.conversationId);
+    window.history.replaceState({}, ""); // don't re-apply on refresh
+  }, [location.state]);
+
+  // Open the requested conversation once it has loaded into the list.
+  useEffect(() => {
+    if (!pendingConvId) return;
+    if (conversations.some((c) => c.id === pendingConvId)) {
+      openChat(pendingConvId);
+      setPendingConvId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingConvId, conversations]);
+
   /* ─── Listen for header button events ─── */
   useEffect(() => {
     const onContacts = () => setShowContactsPanel(true);
@@ -649,33 +755,7 @@ const InboxPage: React.FC = () => {
 
     // Fetch actual messages from API
     if (!token) return;
-    try {
-      const res = await fetch(
-        `/api/messages/${encodeURIComponent(id)}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (res.ok) {
-        const msgs = await res.json();
-        const mapped: Message[] = msgs.map((m: any) => ({
-          id: m._id,
-          text: m.body || "",
-          sent: m.direction === "outbound",
-          time: m.timestamp
-            ? new Date(m.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "",
-          subject: m.subject || undefined,
-          attachments: m.attachments || [],
-        }));
-        setConversations((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, messages: mapped } : c)),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to fetch messages:", err);
-    }
+    await loadMessages(id);
 
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

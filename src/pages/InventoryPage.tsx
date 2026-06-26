@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import DOMPurify from "dompurify";
 import "./InventoryPage.css";
 import { authFetch } from "../utils/authFetch";
@@ -86,6 +87,18 @@ function formatSize(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+// Storage-bar formatter: stays in MB until a value reaches 1 GB, then switches
+// to GB. Each value is scaled by its own magnitude (e.g. "123 MB / 2 GB").
+function formatStorage(bytes: number): string {
+  const MB = 1024 * 1024;
+  const GB = 1024 * MB;
+  if (bytes >= GB) {
+    return `${+(bytes / GB).toFixed(1)} GB`;
+  }
+  const mb = bytes / MB;
+  return `${mb >= 10 ? Math.round(mb) : +mb.toFixed(1)} MB`;
 }
 
 function timeAgo(dateStr: string): string {
@@ -283,6 +296,7 @@ const InventoryPage: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const location = useLocation();
 
   // Navigation — breadcrumb trail
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -320,6 +334,16 @@ const InventoryPage: React.FC = () => {
 
   // Track the clientId from the first root-level folder (for creating subfolders)
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
+
+  // Storage usage (drives the storage bar)
+  const [usage, setUsage] = useState<{
+    plan: string;
+    usedBytes: number;
+    limitBytes: number;
+  } | null>(null);
+
+  // Upload error message (e.g. storage-limit reached)
+  const [uploadError, setUploadError] = useState("");
 
   /* ─── Load items ─── */
   const loadItems = useCallback(async () => {
@@ -368,6 +392,37 @@ const InventoryPage: React.FC = () => {
     const timer = setTimeout(loadItems, 250);
     return () => clearTimeout(timer);
   }, [loadItems]);
+
+  /* ─── Storage usage ─── */
+  const loadUsage = useCallback(async () => {
+    try {
+      const res = await authFetch(`${API}/usage`);
+      if (res.ok) setUsage(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUsage();
+  }, [loadUsage]);
+
+  // Read navigation state from ClientDetailModal (search or folderId)
+  useEffect(() => {
+    const state = location.state as { search?: string; folderId?: string; clientId?: string } | null;
+    if (!state) return;
+    if (state.search) {
+      setSearch(state.search);
+      setCurrentFolderId(null);
+    } else if (state.folderId) {
+      setCurrentFolderId(state.folderId);
+      if (state.clientId) setActiveClientId(state.clientId);
+      setSearch("");
+    }
+    // Clear the state so refreshing doesn't re-apply
+    window.history.replaceState({}, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   /* ─── Breadcrumbs ─── */
   const loadBreadcrumbs = useCallback(async () => {
@@ -441,6 +496,7 @@ const InventoryPage: React.FC = () => {
   const selectFile = (file: File) => {
     setUploadFile_(file);
     setFileSizeError(file.size > MAX_FILE_SIZE);
+    setUploadError("");
   };
 
   const handleUpload = async () => {
@@ -484,7 +540,15 @@ const InventoryPage: React.FC = () => {
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(xhr.responseText || "Upload failed"));
+          else {
+            let msg = "Upload failed";
+            try {
+              msg = JSON.parse(xhr.responseText).error || msg;
+            } catch {
+              /* non-JSON response — keep default */
+            }
+            reject(new Error(msg));
+          }
         };
         xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.send(formData);
@@ -493,10 +557,15 @@ const InventoryPage: React.FC = () => {
       setUploadOpen(false);
       setUploadFile_(null);
       setFileSizeError(false);
+      setUploadError("");
       loadItems();
+      loadUsage();
     } catch (err) {
       console.error(err);
-      alert("Failed to upload file.");
+      setUploadError(
+        err instanceof Error ? err.message : "Failed to upload file.",
+      );
+      loadUsage();
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -540,6 +609,7 @@ const InventoryPage: React.FC = () => {
       await deleteItem(deleteTarget._id);
       setDeleteTarget(null);
       loadItems();
+      loadUsage();
     } catch (err) {
       console.error(err);
       alert("Failed to delete item.");
@@ -658,6 +728,28 @@ const InventoryPage: React.FC = () => {
             Client assets organized automatically.
           </p>
         </div>
+
+        {/* Storage usage bar */}
+        {usage &&
+          (() => {
+            const pct = usage.limitBytes
+              ? Math.round((usage.usedBytes / usage.limitBytes) * 100)
+              : 0;
+            const level = pct >= 90 ? "danger" : pct >= 70 ? "warn" : "ok";
+            return (
+              <div className="inv__storage">
+                <div className="inv__storage-track">
+                  <div
+                    className={`inv__storage-fill inv__storage-fill--${level}`}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  />
+                </div>
+                <span className="inv__storage-label">
+                  {formatStorage(usage.usedBytes)} / {formatStorage(usage.limitBytes)} used · {pct}%
+                </span>
+              </div>
+            );
+          })()}
       </div>
 
       {/* Toolbar */}
@@ -687,6 +779,7 @@ const InventoryPage: React.FC = () => {
             className="inv__btn inv__btn--primary"
             onClick={() => {
               setUploadFile_(null);
+              setUploadError("");
               setUploadOpen(true);
             }}
           >
@@ -995,6 +1088,10 @@ const InventoryPage: React.FC = () => {
               }}
             />
 
+            {uploadError && (
+              <div className="inv__upload-error">{uploadError}</div>
+            )}
+
             {!uploading && (
               <div className="inv__modal-actions">
                 <button
@@ -1003,6 +1100,7 @@ const InventoryPage: React.FC = () => {
                     setUploadOpen(false);
                     setUploadFile_(null);
                     setFileSizeError(false);
+                    setUploadError("");
                   }}
                 >
                   Cancel

@@ -1,5 +1,7 @@
 import express from "express";
-import { createGmailClient } from "../utils/gmailClient.js";
+import { wakeAwaitingReply } from "../sequences/engine.js";
+import { syncGmailMessages } from "../utils/gmailSync.js";
+import { publish } from "../utils/realtime.js";
 
 // Escape special regex characters to prevent ReDoS
 function escapeRegex(str) {
@@ -10,7 +12,7 @@ function escapeRegex(str) {
  * Webhook routes for external services (Gmail Pub/Sub, WhatsApp).
  * These routes do NOT use authMiddleware since they're called by external services.
  */
-export default function createWebhooksRouter(Connection, Message, TrackedContact, Client) {
+export default function createWebhooksRouter(Connection, Message, TrackedContact, Client, sequenceModels) {
   const router = express.Router();
 
   // ─── POST /api/webhooks/gmail ───
@@ -51,138 +53,16 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
         return;
       }
 
-      const userId = connection.userId;
-      const previousHistoryId = connection.gmailHistoryId;
-
-      if (!previousHistoryId) {
-        console.log("⚠️ Gmail webhook: no previousHistoryId stored, skipping");
-        connection.gmailHistoryId = historyId;
-        await connection.save();
-        return;
-      }
-
-      // Fetch history since last known historyId
-      const { gmail } = createGmailClient(connection);
-
-      try {
-        const historyResponse = await gmail.users.history.list({
-          userId: "me",
-          startHistoryId: previousHistoryId,
-          historyTypes: ["messageAdded"],
-          labelId: "INBOX",
-        });
-
-        // Update stored historyId
-        connection.gmailHistoryId = historyId;
-        await connection.save();
-
-        const histories = historyResponse.data.history || [];
-        if (histories.length === 0) {
-          console.log("📭 Gmail webhook: no new messages in history");
-          return;
-        }
-
-        // Collect all new message IDs
-        const messageIds = new Set();
-        for (const h of histories) {
-          if (h.messagesAdded) {
-            for (const ma of h.messagesAdded) {
-              messageIds.add(ma.message.id);
-            }
-          }
-        }
-
-        console.log(`📬 Gmail webhook: ${messageIds.size} new message(s) to process`);
-
-        // Process each message
-        for (const msgId of messageIds) {
-          try {
-            // Check if we already have this message
-            const existing = await Message.findOne({ externalId: msgId });
-            if (existing) continue;
-
-            // Fetch full message
-            const msgResponse = await gmail.users.messages.get({
-              userId: "me",
-              id: msgId,
-              format: "full",
-            });
-
-            const msg = msgResponse.data;
-            const headers = msg.payload.headers || [];
-
-            const getHeader = (name) =>
-              headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-
-            const from = getHeader("From");
-            const to = getHeader("To");
-            const subject = getHeader("Subject");
-            const dateHeader = getHeader("Date");
-
-            // Determine direction: if "From" matches our connected email, it's outbound
-            const isOutbound = from.toLowerCase().includes(emailAddress.toLowerCase());
-            const contactEmail = isOutbound
-              ? extractEmail(to)
-              : extractEmail(from);
-            const contactName = isOutbound
-              ? extractName(to)
-              : extractName(from);
-
-            if (!contactEmail) continue;
-
-            // Match against tracked contacts for this user
-            const trackedContact = await TrackedContact.findOne({
-              userId,
-              email: contactEmail.toLowerCase(),
-            });
-
-            // Also check if they're a Client
-            const client = await Client.findOne({
-              userId,
-              email: contactEmail.toLowerCase(),
-            });
-
-            // Only store messages from tracked contacts or clients
-            if (!trackedContact && !client) {
-              continue;
-            }
-
-            // Extract body text
-            const body = extractBody(msg.payload);
-
-            const newMessage = new Message({
-              userId,
-              channel: "gmail",
-              contactId: trackedContact?._id || client?._id || null,
-              contactName: contactName || trackedContact?.name || client?.name || contactEmail,
-              contactIdentifier: contactEmail,
-              externalId: msgId,
-              threadId: msg.threadId,
-              direction: isOutbound ? "outbound" : "inbound",
-              body,
-              subject,
-              status: "delivered",
-              timestamp: dateHeader ? new Date(dateHeader) : new Date(),
-              rawPayload: { id: msgId, threadId: msg.threadId, labelIds: msg.labelIds },
-            });
-
-            await newMessage.save();
-            console.log(
-              `💾 Stored ${isOutbound ? "outbound" : "inbound"} Gmail message from ${contactEmail}`
-            );
-          } catch (msgErr) {
-            console.error(`⚠️ Error processing message ${msgId}:`, msgErr.message);
-          }
-        }
-      } catch (histErr) {
-        if (histErr.code === 404) {
-          // historyId too old, need a full sync
-          console.log("⚠️ Gmail history expired, updating historyId");
-          connection.gmailHistoryId = historyId;
-          await connection.save();
-        } else {
-          throw histErr;
-        }
+      // Delegate to the shared, idempotent sync. It re-scans the recent INBOX
+      // window (deduped by externalId), so it reliably picks up the new message
+      // the notification is about — without the History-API cursor races that
+      // previously dropped messages. Inbound replies wake sequences via
+      // sequenceModels passed through to processGmailMessage.
+      const newCount = await syncGmailMessages(
+        connection, Message, TrackedContact, Client, sequenceModels
+      );
+      if (newCount > 0) {
+        console.log(`📬 Gmail webhook: ${newCount} new message(s) stored for ${emailAddress}`);
       }
     } catch (err) {
       console.error("Gmail webhook error:", err.message);
@@ -300,6 +180,19 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
 
               await newMessage.save();
               console.log(`💾 WhatsApp message stored from ${senderPhone}`);
+
+              // Push to any open inbox tabs for this user so it appears live.
+              publish(userId, {
+                type: "new-message",
+                channel: "whatsapp",
+                direction: "inbound",
+                contactIdentifier: senderPhone,
+              });
+
+              // Inbound reply → wake any sequence enrollment waiting on a reply.
+              if (sequenceModels) {
+                wakeAwaitingReply(sequenceModels, userId, senderPhone).catch(() => {});
+              }
             } catch (msgErr) {
               console.error("⚠️ Error processing WhatsApp message:", msgErr.message);
             }
@@ -312,49 +205,4 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
   });
 
   return router;
-}
-
-/* ─── Helpers ─── */
-
-function extractEmail(headerValue) {
-  const match = headerValue.match(/<([^>]+)>/);
-  return match ? match[1].toLowerCase() : headerValue.trim().toLowerCase();
-}
-
-function extractName(headerValue) {
-  const match = headerValue.match(/^"?([^"<]+)"?\s*</);
-  return match ? match[1].trim() : "";
-}
-
-function extractBody(payload) {
-  // Try to get plain text body
-  if (payload.mimeType === "text/plain" && payload.body?.data) {
-    return Buffer.from(payload.body.data, "base64").toString("utf8");
-  }
-
-  // Check parts recursively
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.mimeType === "text/plain" && part.body?.data) {
-        return Buffer.from(part.body.data, "base64").toString("utf8");
-      }
-    }
-    // Fallback to HTML if no plain text
-    for (const part of payload.parts) {
-      if (part.mimeType === "text/html" && part.body?.data) {
-        const html = Buffer.from(part.body.data, "base64").toString("utf8");
-        // Basic HTML stripping
-        return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-      }
-    }
-    // Check nested parts (multipart/alternative inside multipart/mixed)
-    for (const part of payload.parts) {
-      if (part.parts) {
-        const nested = extractBody(part);
-        if (nested) return nested;
-      }
-    }
-  }
-
-  return "";
 }

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --test server/sequences/__tests__/engine.test.js server/sequences/__tests__/capSweep.test.js server/sequences/__tests__/capSweep.test.js)",
+      "Bash(node -e \"const s=require\\('stripe'\\); console.log\\('stripe version:', require\\('./node_modules/stripe/package.json'\\).version\\)\")",
+      "WebSearch"
+    ]
+  }
+}

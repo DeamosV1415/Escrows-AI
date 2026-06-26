@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(curl -sN -X POST http://localhost:3001/api/agent/chat -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"message\":\"hi\"}' -i --max-time 20)",
+      "Bash(npm install *)",
+      "Bash(node --check server/utils/gmailSync.js)",
+      "Bash(node --check server/index.js)"
+    ]
+  }
+}
