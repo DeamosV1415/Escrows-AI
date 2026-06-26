@@ -88,7 +88,7 @@ const GetStartedChecklist: React.FC<Props> = ({ clientsCount, sequencesRunning }
     {
       id: "channel",
       title: "Connect your inbox",
-      desc: "Link Gmail or WhatsApp so your sequences can actually send.",
+      desc: "Link Gmail so your sequences can actually send. (WhatsApp coming soon.)",
       done: channelDone,
       cta: "Connect",
       to: "/dashboard/settings#integrations",

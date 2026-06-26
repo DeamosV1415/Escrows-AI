@@ -337,6 +337,36 @@
   cursor: not-allowed;
 }
 
+/* Reddit / subreddit CTA — cream base with a Reddit-orange accent on hover so it
+   reads as a distinct community link without fighting the olive primary button. */
+.settings-about-card__text--reddit {
+  margin-top: 16px;
+}
+
+.settings-btn--reddit {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  margin-top: 10px;
+  background: #fff;
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.settings-btn--reddit svg {
+  color: #ff4500;
+  flex-shrink: 0;
+}
+
+.settings-btn--reddit:hover {
+  border-color: #ff4500;
+  background: rgba(255, 69, 0, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 69, 0, 0.14);
+}
+
 .settings-saved {
   font-size: 0.84rem;
   color: var(--olive-700);
@@ -369,6 +399,23 @@
   color: var(--text-primary);
   display: block;
   margin-bottom: 4px;
+}
+
+.settings-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.settings-badge--soon {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .settings-wa-form {

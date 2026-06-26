@@ -10,6 +10,11 @@ import { useAuth } from "../components/AuthContext";
 import * as XLSX from "xlsx";
 import "./InboxPage.css";
 
+/* WhatsApp self-serve onboarding is gated until Meta business verification
+   clears review. Backend (connect/disconnect/webhooks) stays wired up; flip
+   to false once approved. Keep in sync with SettingsPage's WHATSAPP_COMING_SOON. */
+const WHATSAPP_COMING_SOON = true;
+
 /* ─── Types ─── */
 
 type Channel = "gmail" | "whatsapp" | "sms";
@@ -1498,8 +1503,17 @@ const InboxPage: React.FC = () => {
                   </svg>
                 </div>
                 <div className="inbox__connection-info">
-                  <span className="inbox__connection-name">WhatsApp</span>
-                  {connections.whatsapp.connected ? (
+                  <span className="inbox__connection-name">
+                    WhatsApp
+                    {WHATSAPP_COMING_SOON && (
+                      <span className="inbox__connection-badge">Coming soon</span>
+                    )}
+                  </span>
+                  {WHATSAPP_COMING_SOON ? (
+                    <span className="inbox__connection-desc">
+                      Coming soon — we&rsquo;re completing Meta business verification.
+                    </span>
+                  ) : connections.whatsapp.connected ? (
                     <span className="inbox__connection-desc inbox__connection-desc--connected">
                       ✅ Connected as{" "}
                       <strong>{connections.whatsapp.phone}</strong>
@@ -1510,7 +1524,11 @@ const InboxPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                {connections.whatsapp.connected ? (
+                {WHATSAPP_COMING_SOON ? (
+                  <button className="inbox__connect-btn" disabled>
+                    Coming soon
+                  </button>
+                ) : connections.whatsapp.connected ? (
                   <button
                     className="inbox__disconnect-btn"
                     onClick={disconnectWhatsApp}
@@ -1532,7 +1550,7 @@ const InboxPage: React.FC = () => {
                 )}
               </div>
               {/* WhatsApp connect form (inline) */}
-              {showWaForm && !connections.whatsapp.connected && (
+              {!WHATSAPP_COMING_SOON && showWaForm && !connections.whatsapp.connected && (
                 <div className="inbox__wa-form">
                   <input
                     className="inbox__wa-input"

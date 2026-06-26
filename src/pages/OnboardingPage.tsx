@@ -492,7 +492,7 @@ export default function OnboardingPage() {
               </button>
 
               <p className="onboarding-connect__note">
-                Prefer WhatsApp? You can add it anytime from <strong>Settings → Integrations</strong>.
+                WhatsApp is coming soon &mdash; we&rsquo;ll let you connect it from <strong>Settings → Integrations</strong> once it&rsquo;s ready.
               </p>
             </div>
 

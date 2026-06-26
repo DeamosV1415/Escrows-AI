@@ -149,7 +149,13 @@ app.use("/api/", (req, res, next) => {
 // one path from JSON parsing; the route below re-parses it with express.raw().
 app.use((req, res, next) => {
   if (req.originalUrl === "/api/webhooks/billing") return next();
-  return express.json({ limit: "1mb" })(req, res, next);
+  // Capture the raw bytes alongside the parsed JSON so webhook routes that need
+  // HMAC signature verification (e.g. WhatsApp/Meta X-Hub-Signature-256) can
+  // recompute the digest over the exact payload.
+  return express.json({
+    limit: "1mb",
+    verify: (r, _res, buf) => { r.rawBody = buf; },
+  })(req, res, next);
 });
 
 const __filename_early = fileURLToPath(import.meta.url);

@@ -22,6 +22,7 @@ declare global {
               width?: string | number;
               text?: string;
               shape?: string;
+              logo_alignment?: string;
             },
           ) => void;
         };
@@ -97,7 +98,8 @@ export default function LoginPage() {
             size: "large",
             width: "360",
             text: "continue_with",
-            shape: "rectangular",
+            shape: "pill",
+            logo_alignment: "center",
           });
         }
       }
@@ -168,14 +170,7 @@ export default function LoginPage() {
         </div>
 
         {/* Google Sign-In */}
-        <div
-          id="google-signin-btn"
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginBottom: "24px",
-          }}
-        />
+        <div id="google-signin-btn" className="login-google" />
 
         {/* Divider */}
         <div className="login-divider">

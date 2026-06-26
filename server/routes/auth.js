@@ -10,8 +10,14 @@ function generateToken(userId) {
 // ─── hCaptcha server-side verification ───
 async function verifyCaptcha(token) {
   if (!process.env.HCAPTCHA_SECRET_KEY) {
-    console.warn("⚠️ HCAPTCHA_SECRET_KEY not set — skipping captcha verification");
-    return true; // Skip in dev if not configured
+    // Fail CLOSED in production: a missing secret must never silently disable bot
+    // protection on a live signup/login surface. Only skip outside production (dev).
+    if (process.env.NODE_ENV === "production") {
+      console.error("❌ HCAPTCHA_SECRET_KEY not set in production — rejecting request (fail closed).");
+      return false;
+    }
+    console.warn("⚠️ HCAPTCHA_SECRET_KEY not set — skipping captcha verification (non-production only)");
+    return true;
   }
 
   try {
