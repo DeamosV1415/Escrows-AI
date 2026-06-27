@@ -887,6 +887,34 @@
   background: #4285f4;
 }
 
+/* Gmail subject line — stacked above the message box so it's sent as the real
+   email Subject header instead of being typed into the body. */
+.inbox__composer-subject {
+  width: 100%;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.inbox__composer-subject::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.inbox__composer-subject:focus {
+  border-color: var(--olive-300);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(106, 128, 53, 0.08);
+}
+
 .inbox__composer-row {
   display: flex;
   align-items: flex-end;
