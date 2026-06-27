@@ -58,7 +58,7 @@ const DashboardLayout: React.FC = () => {
 
   const content = (
     <div
-      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""}`}
+      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""} ${isInboxPage ? "dashboard-layout--inbox" : ""}`}
     >
       <Sidebar
         collapsed={sidebarCollapsed}

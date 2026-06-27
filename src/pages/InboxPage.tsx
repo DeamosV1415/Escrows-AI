@@ -133,6 +133,7 @@ const InboxPage: React.FC = () => {
   const [pendingConvId, setPendingConvId] = useState<string | null>(null);
   const location = useLocation();
   const [replyText, setReplyText] = useState("");
+  const [subject, setSubject] = useState(""); // Gmail subject line (separate from body)
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
@@ -666,6 +667,18 @@ const InboxPage: React.FC = () => {
     messages: [],
   } : null);
 
+  // Prefill the Gmail subject when switching conversations: keep the thread's subject
+  // on a reply, blank for a brand-new compose. Keyed on the conversation id so it does
+  // not clobber what the user is typing while staying on the same thread.
+  useEffect(() => {
+    if (displayConv?.channel === "gmail") {
+      setSubject((displayConv as { lastSubject?: string }).lastSubject || "");
+    } else {
+      setSubject("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayConv?.id, displayConv?.channel]);
+
   const counts = useMemo(() => {
     return {
       all: conversations.length,
@@ -782,7 +795,10 @@ const InboxPage: React.FC = () => {
           contactIdentifier: targetConv.contactEmail || targetConv.id,
           body: replyText.trim(),
           channel: targetConv.channel,
-          subject: (targetConv as any).lastSubject || undefined,
+          subject:
+            targetConv.channel === "gmail"
+              ? subject.trim() || (targetConv as any).lastSubject || undefined
+              : undefined,
           threadId: (targetConv as any).threadId || undefined,
           contactName: targetConv.contactName,
         }),
@@ -1352,6 +1368,15 @@ const InboxPage: React.FC = () => {
                   !displayConv.contactEmail &&
                   ` · ${displayConv.contactPhone}`}
               </div>
+              {displayConv.channel === "gmail" && (
+                <input
+                  className="inbox__composer-subject"
+                  type="text"
+                  placeholder="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                />
+              )}
               <div className="inbox__composer-row">
                 <textarea
                   className="inbox__composer-input"
