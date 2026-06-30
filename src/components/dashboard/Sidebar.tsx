@@ -7,6 +7,9 @@ import LogoImg from "../../assets/Logo.png";
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  /* Mobile drawer state (decoupled from the desktop collapse rail). */
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 const ICON_DASHBOARD = (
@@ -173,7 +176,7 @@ const bottomItems = [
 ];
 
 /* ─── Profile Popup ─── */
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobileOpen, onCloseMobile }) => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -246,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
   };
 
   return (
-    <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""}`}>
+    <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""} ${mobileOpen ? "sidebar--mobile-open" : ""}`}>
       {/* Logo area */}
       <div className="sidebar__header">
         <div
@@ -258,6 +261,17 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
           <img src={LogoImg} alt="EscrowsAI" className="sidebar__logo-img" />
           {!collapsed && <span className="sidebar__logo-text">EscrowsAI</span>}
         </div>
+        {/* Mobile: close the drawer. Desktop-only collapse chevron is hidden on phones. */}
+        <button
+          className="sidebar__close-mobile"
+          onClick={onCloseMobile}
+          aria-label="Close navigation menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
         {!collapsed && (
           <button
             className="sidebar__toggle"

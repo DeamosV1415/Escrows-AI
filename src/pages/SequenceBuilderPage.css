@@ -64,7 +64,15 @@
 }
 .sb__resizer:hover::after, body.sb--resizing .sb__resizer::after { background: var(--gold-accent); height: 48px; }
 body.sb--resizing { cursor: col-resize; user-select: none; }
-.sb__palette-title { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+.sb__palette-title {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 0; margin-bottom: 10px;
+  background: none; border: none; cursor: default;
+  font-family: var(--font-body); font-weight: 700; font-size: 13px;
+  color: var(--text-primary); text-align: left;
+}
+/* Small dropdown arrow next to "Blocks" (shown on the collapsible phone layout). */
+.sb__palette-chevron { display: none; flex-shrink: 0; color: var(--text-muted); transition: transform 0.2s ease; }
 .sb__palette-group { margin-bottom: 14px; }
 .sb__palette-fam { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
 .sb__palette-item {
@@ -189,3 +197,54 @@ body.sb--resizing { cursor: col-resize; user-select: none; }
 /* react flow tweaks */
 .react-flow__edge-text { font-size: 10px; font-weight: 600; }
 .react-flow__attribution { display: none; }
+
+/* ─── Phone layout ───
+   Placed at the END of the file so these overrides win over the base rules above
+   (same specificity → later source order wins). The 3-pane desktop layout
+   (palette │ canvas │ config) can't fit a phone, so stack it vertically: a
+   collapsible block palette on top, a fixed-height pan/zoom canvas, then the
+   config panel full-width below. Inline widths from React resize state are
+   overridden with !important. */
+@media (max-width: 768px) {
+  /* Compact, neatly-wrapping topbar — smaller buttons that size to content
+     instead of stretching full-width. */
+  .sb__topbar { flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px; }
+  .sb__back { font-size: 12.5px; }
+  .sb__name { min-width: 0; flex: 1 1 120px; font-size: 14px; padding: 5px 7px; }
+  .sb__top-actions { margin-left: 0; width: 100%; gap: 6px; flex-wrap: wrap; }
+  .sb__btn { padding: 6px 10px; font-size: 12px; }
+
+  .sb__body { flex-direction: column; overflow-y: auto; }
+
+  /* Collapsible block palette: just the "Blocks" toggle row (with a dropdown
+     arrow) until expanded, so it no longer eats vertical space when not in use. */
+  .sb__palette {
+    width: 100% !important;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-medium);
+  }
+  .sb__palette-title { cursor: pointer; margin-bottom: 0; }
+  .sb__palette-chevron { display: block; }
+  .sb__palette--open .sb__palette-title { margin-bottom: 10px; }
+  .sb__palette--open .sb__palette-chevron { transform: rotate(180deg); }
+  .sb__palette-body { display: none; }
+  .sb__palette--open .sb__palette-body { display: block; }
+  .sb__palette--open { max-height: 50vh; overflow-y: auto; }
+
+  /* Drag-to-resize splitters are pointless in the stacked/touch layout. */
+  .sb__resizer { display: none; }
+
+  /* Give the canvas a concrete height so ReactFlow can render + pan/zoom. */
+  .sb__canvas { flex: none; height: 60vh; min-height: 320px; }
+
+  /* When a block IS selected its config opens below (scrollable). When nothing
+     is selected, hide the panel entirely so the placeholder hint doesn't eat the
+     limited space. */
+  .sb__config {
+    width: 100% !important;
+    border-left: none;
+    border-top: 1px solid var(--border-medium);
+  }
+  .sb__config:has(.sb__config-empty) { display: none; }
+}

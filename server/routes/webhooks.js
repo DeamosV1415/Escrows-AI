@@ -173,18 +173,60 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
 
           for (const msg of value.messages) {
             try {
-              // Skip non-text messages for now
-              if (msg.type !== "text") {
-                console.log(`⏭️ WhatsApp webhook: skipping ${msg.type} message`);
-                continue;
-              }
-
               // Check if we already stored this message
               const existing = await Message.findOne({ externalId: msg.id });
               if (existing) continue;
 
               const senderPhone = msg.from; // e.g. "15551234567"
-              const messageBody = msg.text?.body || "";
+
+              // Derive a display body. Text comes through as-is; every other
+              // type gets a lightweight placeholder so the conversation still
+              // shows up in the inbox (full media rendering is future work).
+              let messageBody;
+              switch (msg.type) {
+                case "text":
+                  messageBody = msg.text?.body || "";
+                  break;
+                case "image":
+                  messageBody = msg.image?.caption || "📷 Photo";
+                  break;
+                case "video":
+                  messageBody = msg.video?.caption || "🎥 Video";
+                  break;
+                case "audio":
+                  messageBody = "🎤 Voice message";
+                  break;
+                case "document":
+                  messageBody = msg.document?.filename
+                    ? `📎 ${msg.document.filename}`
+                    : "📎 Document";
+                  break;
+                case "sticker":
+                  messageBody = "💟 Sticker";
+                  break;
+                case "location":
+                  messageBody = "📍 Location";
+                  break;
+                case "contacts":
+                  messageBody = "👤 Contact card";
+                  break;
+                case "button":
+                  messageBody = msg.button?.text || "Button reply";
+                  break;
+                case "interactive":
+                  messageBody =
+                    msg.interactive?.button_reply?.title ||
+                    msg.interactive?.list_reply?.title ||
+                    "Interactive reply";
+                  break;
+                case "reaction":
+                  messageBody = msg.reaction?.emoji
+                    ? `Reacted ${msg.reaction.emoji}`
+                    : "Reaction";
+                  break;
+                default:
+                  messageBody = `[${msg.type} message]`;
+              }
 
               // Get contact name from the contacts array
               const contactInfo = value.contacts?.find(
@@ -192,23 +234,21 @@ export default function createWebhooksRouter(Connection, Message, TrackedContact
               );
               const senderName = contactInfo?.profile?.name || senderPhone;
 
-              // Match against tracked contacts
+              // Enrich with a tracked contact / client when the sender matches
+              // by the last 10 digits of their phone — but store the message
+              // either way so the inbox shows every inbound conversation, just
+              // like Gmail does for email from anyone.
+              const phoneTail = senderPhone.slice(-10);
               const trackedContact = await TrackedContact.findOne({
                 userId,
-                phone: { $regex: escapeRegex(senderPhone.slice(-10)), $options: "i" },
+                phone: { $regex: escapeRegex(phoneTail), $options: "i" },
               });
 
               // Also check clients
               const client = await Client.findOne({
                 userId,
-                phone: { $regex: escapeRegex(senderPhone.slice(-10)), $options: "i" },
+                phone: { $regex: escapeRegex(phoneTail), $options: "i" },
               });
-
-              // Only store messages from tracked contacts or clients
-              if (!trackedContact && !client) {
-                console.log(`⏭️ WhatsApp: untracked sender ${senderPhone}, skipping`);
-                continue;
-              }
 
               const newMessage = new Message({
                 userId,

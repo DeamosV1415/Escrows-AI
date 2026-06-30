@@ -1026,6 +1026,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Gutter so the modal reads as a centered popup with breathing room instead of
+     spanning edge-to-edge on phones (desktop is unaffected — the 520px cap already
+     leaves margins). */
+  padding: 24px;
   z-index: 10000;
   animation: overlayFadeIn 0.2s ease;
 }
@@ -1310,6 +1314,17 @@
   text-align: center;
 }
 
+.inbox__wa-note {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+}
+
 .inbox__wa-hint a {
   color: var(--olive-600);
   text-decoration: underline;
@@ -1326,6 +1341,9 @@
   color: var(--olive-600);
   font-size: 1.1rem;
   font-weight: 500;
+  /* line-height:1 so the "+" glyph centres in the circle instead of riding high
+     on the inherited 1.6 line box. */
+  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1795,7 +1813,25 @@
 .inbox__contacts-body {
   flex: 1;
   overflow-y: auto;
+  /* Vertical scroll only. Without this, overflow-x computes to `auto` (spec rule
+     when overflow-y is non-visible), so the wide contacts table would drag the
+     toolbar + filters sideways with it. Horizontal scroll lives on the table wrap. */
+  overflow-x: hidden;
   padding: 20px 24px 24px;
+}
+
+/* Only the table scrolls horizontally — the search bar and filter pills above
+   stay locked in place. */
+.inbox__contacts-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.inbox__contacts-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.inbox__contacts-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
 }
 
 .inbox__contacts-body::-webkit-scrollbar {
@@ -1926,6 +1962,10 @@
 
 .inbox__contacts-table {
   width: 100%;
+  /* Keep the columns at a comfortable width; on narrow panels this makes the
+     table overflow its wrap so it can be swiped horizontally (while the toolbar
+     and filters above stay put). */
+  min-width: 560px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -2030,12 +2070,19 @@
 }
 
 .inbox__contact-channel-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Slightly larger glyphs here (easier tap targets) without touching the mini
+   icons used in the conversation list. */
+.inbox__contact-channel-dot svg {
+  width: 15px;
+  height: 15px;
 }
 
 .inbox__contact-channel-dot--gmail {
@@ -2056,6 +2103,23 @@
 .inbox__contact-channel-dot--inactive {
   background: var(--bg-secondary);
   color: var(--border-medium);
+}
+
+/* A live channel dot acts as a "message on this channel" button. */
+.inbox__contact-channel-dot--clickable {
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+.inbox__contact-channel-dot--clickable:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.inbox__contact-channel-dot--clickable:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 /* Empty table state */
@@ -2126,5 +2190,35 @@
 
   .inbox__composer {
     padding: 12px 16px;
+  }
+
+  /* Contacts slide-over fills the whole screen on phones (was a 680px / 90vw
+     panel that left an awkward sliver of the page behind it). The resize handle
+     is pointless at full width. The inline width from React state is overridden. */
+  .inbox__contacts-panel {
+    width: 100% !important;
+    max-width: 100%;
+  }
+  .inbox__contacts-resize {
+    display: none;
+  }
+
+  /* Connect Apps modal: keep each provider row contained. Let the text column
+     shrink (so long emails wrap instead of shoving the button off-screen) and
+     drop the action button onto its own full-width line. */
+  .inbox__connection {
+    flex-wrap: wrap;
+  }
+  .inbox__connection-info {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  .inbox__connection-desc {
+    overflow-wrap: anywhere;
+  }
+  .inbox__connection .inbox__connect-btn,
+  .inbox__connection .inbox__disconnect-btn {
+    flex: 1 1 100%;
+    width: 100%;
   }
 }

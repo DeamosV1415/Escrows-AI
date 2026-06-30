@@ -6,7 +6,7 @@ import { useAuth } from "../components/AuthContext";
 /* WhatsApp self-serve onboarding is gated until Meta business verification
    clears review. Backend (connect/disconnect/webhooks) stays wired up so we
    can flip this to false the moment we're approved. */
-const WHATSAPP_COMING_SOON = true;
+const WHATSAPP_COMING_SOON = false;
 
 /* ─── Types ─── */
 interface ProfileForm {
@@ -171,6 +171,16 @@ const SettingsPage: React.FC = () => {
     return SECTIONS.some((s) => s.id === h) ? (h as SectionId) : "profile";
   })();
   const [active, setActive] = useState<SectionId>(initialSection);
+  // Mobile drill-down: the section list (level 1) vs a single section page (level 2).
+  // Desktop ignores this (CSS shows both panes). Deep-links open straight to the page.
+  const [mobileDetail, setMobileDetail] = useState<boolean>(
+    () => window.location.hash.replace("#", "") !== "" &&
+      SECTIONS.some((s) => s.id === window.location.hash.replace("#", "")),
+  );
+  const openSection = useCallback((id: SectionId) => {
+    setActive(id);
+    setMobileDetail(true);
+  }, []);
 
   /* ─── Profile ─── */
   const [profile, setProfile] = useState<ProfileForm>({
@@ -735,6 +745,11 @@ const SettingsPage: React.FC = () => {
           </p>
           {!WHATSAPP_COMING_SOON && showWaForm && !integrations.whatsapp.connected && (
             <div className="settings-wa-form">
+              <p className="settings-field__hint settings-wa-form__note">
+                💡 Manual setup for now. Once our Meta verification is approved,
+                connecting WhatsApp will take just a couple of clicks — no Phone
+                Number ID or token needed.
+              </p>
               <input
                 className="settings-input"
                 placeholder="Phone Number ID"
@@ -983,7 +998,7 @@ const SettingsPage: React.FC = () => {
         {low && (
           <div className="settings-credits-warn">
             <span>You’re running low on credits this month.</span>
-            <button className="settings-link-btn" onClick={() => setActive("billing")}>
+            <button className="settings-link-btn" onClick={() => openSection("billing")}>
               Upgrade for more →
             </button>
           </div>
@@ -1138,7 +1153,7 @@ const SettingsPage: React.FC = () => {
   const NavItem: React.FC<{ s: (typeof SECTIONS)[number] }> = ({ s }) => (
     <button
       className={`settings__nav-item ${active === s.id ? "settings__nav-item--active" : ""}`}
-      onClick={() => setActive(s.id)}
+      onClick={() => openSection(s.id)}
     >
       <span className="settings__nav-icon" aria-hidden>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -1147,6 +1162,12 @@ const SettingsPage: React.FC = () => {
       </span>
       <span className="settings__nav-label">{s.label}</span>
       {!s.live && <span className="settings__nav-soon">soon</span>}
+      {/* Drill-down affordance — shown only in the mobile list view. */}
+      <span className="settings__nav-chevron" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </span>
     </button>
   );
 
@@ -1154,7 +1175,7 @@ const SettingsPage: React.FC = () => {
   const soonSections = SECTIONS.filter((s) => !s.live);
 
   return (
-    <div className="settings">
+    <div className={`settings ${mobileDetail ? "settings--detail" : ""}`}>
       <div className="settings__header">
         <h1 className="settings__title">Settings</h1>
         <p className="settings__subtitle">Manage your account, automation defaults, and connections.</p>
@@ -1176,6 +1197,13 @@ const SettingsPage: React.FC = () => {
         </nav>
 
         <div className="settings__content">
+          {/* Mobile drill-down back header — hidden on desktop. */}
+          <button className="settings__back" onClick={() => setMobileDetail(false)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Settings
+          </button>
           <div key={active} className="settings__panel-anim">
             {renderActive()}
           </div>

@@ -444,17 +444,56 @@
   padding: 10px;
 }
 
-/* ─── Mobile overlay ─── */
+/* Mobile-only drawer close button (X). Hidden on desktop. */
+.sidebar__close-mobile {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: rgba(168, 184, 126, 0.08);
+  color: rgba(168, 184, 126, 0.7);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.sidebar__close-mobile:hover {
+  background: rgba(168, 184, 126, 0.15);
+  color: #e8edda;
+}
+
+/* ─── Mobile slide-in drawer ─── */
 
 @media (max-width: 1024px) {
-  .sidebar {
+  /* On phones the sidebar is a slide-in drawer: always the full-width expanded
+     layout (the desktop collapse rail does not apply here), hidden off-canvas
+     until `sidebar--mobile-open` slides it in. */
+  .sidebar,
+  .sidebar.sidebar--collapsed {
+    width: 280px;
+    min-width: 280px;
+    max-width: 85vw;
     transform: translateX(-100%);
+    /* The base transition only animates width/min-width; on mobile the drawer
+       slides via transform, so it must be animated too or it snaps instantly. */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: none;
   }
 
-  .sidebar:not(.sidebar--collapsed) {
+  .sidebar--mobile-open {
     transform: translateX(0);
-    box-shadow: 20px 0 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 24px 0 60px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Desktop collapse chevron is meaningless on mobile; use the X instead. */
+  .sidebar__toggle {
+    display: none;
+  }
+
+  .sidebar__close-mobile {
+    display: flex;
   }
 }
 
@@ -489,6 +528,30 @@
 @keyframes menuFadeIn {
   from { opacity: 0; transform: translateX(-6px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+/* On the mobile drawer the side-anchored menu ran off-screen. Open it upward,
+   aligned within the drawer, and trim it down a touch. */
+@media (max-width: 1024px) {
+  .profile-menu {
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: auto;
+    animation: menuFadeUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .profile-menu__header { padding: 12px 14px; gap: 10px; }
+  .profile-menu__avatar,
+  .profile-menu__avatar--img { width: 36px; height: 36px; }
+  .profile-menu__name { font-size: 0.85rem; }
+  .profile-menu__email { font-size: 0.72rem; }
+  .profile-menu__btn { padding: 10px 14px; font-size: 0.82rem; }
+}
+
+@keyframes menuFadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .profile-menu__header {

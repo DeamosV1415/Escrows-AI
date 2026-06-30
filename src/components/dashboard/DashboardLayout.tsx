@@ -10,12 +10,47 @@ import CopilotBubble from "./CopilotBubble";
 import WelcomeTour from "./WelcomeTour";
 import "./DashboardLayout.css";
 
+const MOBILE_BREAKPOINT = 1024;
+
 const DashboardLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Mobile nav drawer is a separate concern from the desktop collapse rail:
+  // it slides in over a backdrop and is closed by default so it never buries
+  // page content on phones.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const location = useLocation();
   const isInboxPage = location.pathname === "/dashboard/inbox";
   const isCopilotPage = location.pathname === "/dashboard/copilot";
+
+  // Keep the desktop collapse state from bleeding into the mobile drawer's inner
+  // layout: on phones the sidebar always renders its full-width (expanded) content
+  // and visibility is driven solely by `mobileNavOpen`. Reset on resize across the
+  // breakpoint so a drawer left open on one form factor doesn't linger on the other.
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth <= MOBILE_BREAKPOINT) {
+        setSidebarCollapsed(false);
+        setMobileNavOpen(false);
+      }
+    };
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Close the mobile drawer whenever the route changes (i.e. a nav link was tapped).
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll behind the open mobile drawer.
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
 
   // Tell the backend which timezone this broker is in, so sequence quiet hours (and
   // schedule/wait_until timing) are evaluated in their local time instead of UTC. Runs once
@@ -58,11 +93,20 @@ const DashboardLayout: React.FC = () => {
 
   const content = (
     <div
-      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""} ${isInboxPage ? "dashboard-layout--inbox" : ""}`}
+      className={`dashboard-layout ${sidebarCollapsed ? "dashboard-layout--collapsed" : ""} ${isCopilotPage ? "dashboard-layout--copilot" : ""} ${isInboxPage ? "dashboard-layout--inbox" : ""} ${mobileNavOpen ? "dashboard-layout--nav-open" : ""}`}
     >
       <Sidebar
         collapsed={sidebarCollapsed}
+        mobileOpen={mobileNavOpen}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
+
+      {/* Backdrop scrim — tap to dismiss the mobile drawer */}
+      <div
+        className="dashboard-layout__scrim"
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
       />
 
       <div className="dashboard-layout__main">
@@ -71,8 +115,9 @@ const DashboardLayout: React.FC = () => {
           {/* Mobile sidebar toggle */}
           <button
             className="dashboard-header__mobile-toggle"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            aria-label="Toggle sidebar"
+            onClick={() => setMobileNavOpen((open) => !open)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileNavOpen}
           >
             <svg
               width="20"

@@ -119,6 +119,14 @@
   padding: 1px 6px;
 }
 
+/* Drill-down affordances — desktop hides both (two-pane is always visible). */
+.settings__nav-chevron {
+  display: none;
+}
+.settings__back {
+  display: none;
+}
+
 /* ─── Content panel ─── */
 
 .settings__content {
@@ -471,16 +479,72 @@
   .settings__body {
     grid-template-columns: 1fr;
   }
-  .settings__nav {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .settings__nav-item {
-    width: auto;
-  }
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* ─── Mobile drill-down ─── */
+
+  /* Level 1 — section list: clean, full-width tappable rows with a chevron. */
+  .settings__nav {
+    position: static;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .settings__nav-item {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    background: var(--bg-card);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+  }
+  /* No persistent "active" highlight in the list — every row reads equally. */
+  .settings__nav-item--active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-weight: 400;
+  }
+  .settings__nav-item--active .settings__nav-icon {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+  }
+  .settings__nav-chevron {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+  }
+  .settings__nav-divider {
+    margin: 18px 4px 4px;
+  }
+
+  /* List view hides the section page; section page hides the list + big title. */
+  .settings:not(.settings--detail) .settings__content {
+    display: none;
+  }
+  .settings--detail .settings__nav,
+  .settings--detail .settings__header {
+    display: none;
+  }
+
+  /* Back header inside a section page. */
+  .settings--detail .settings__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 14px;
+    padding: 6px 10px 6px 2px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .settings--detail .settings__back:hover {
+    color: var(--text-primary);
   }
 }
 
