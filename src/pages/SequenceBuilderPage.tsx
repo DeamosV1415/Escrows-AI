@@ -169,6 +169,9 @@ function Builder() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [otherSeqs, setOtherSeqs] = useState<Sequence[]>([]);
+  // Collapsible block palette — only takes effect on the phone layout (CSS keeps
+  // the palette expanded on desktop regardless of this flag).
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Freely resizable side panels (palette on the left, config on the right). Persisted.
@@ -357,19 +360,31 @@ function Builder() {
 
       <div className="sb__body">
         {/* palette */}
-        <div className="sb__palette" style={{ width: paletteW }}>
-          <div className="sb__palette-title">Blocks</div>
-          {(["trigger", "action", "control", "exit"] as Family[]).map((fam) => (
-            <div key={fam} className="sb__palette-group">
-              <div className="sb__palette-fam" style={{ color: FAMILY_COLOR[fam] }}>{FAMILY_LABEL[fam]}</div>
-              {Object.values(BLOCK_META).filter((b) => b.family === fam).map((b) => (
-                <button key={b.type} className="sb__palette-item" onClick={() => addBlock(b.type)} title={b.description}>
-                  <span className="sb__palette-dot" style={{ background: FAMILY_COLOR[fam] }} />
-                  {b.label}
-                </button>
-              ))}
-            </div>
-          ))}
+        <div className={`sb__palette ${paletteOpen ? "sb__palette--open" : ""}`} style={{ width: paletteW }}>
+          <button
+            type="button"
+            className="sb__palette-title"
+            onClick={() => setPaletteOpen((o) => !o)}
+            aria-expanded={paletteOpen}
+          >
+            Blocks
+            <svg className="sb__palette-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div className="sb__palette-body">
+            {(["trigger", "action", "control", "exit"] as Family[]).map((fam) => (
+              <div key={fam} className="sb__palette-group">
+                <div className="sb__palette-fam" style={{ color: FAMILY_COLOR[fam] }}>{FAMILY_LABEL[fam]}</div>
+                {Object.values(BLOCK_META).filter((b) => b.family === fam).map((b) => (
+                  <button key={b.type} className="sb__palette-item" onClick={() => addBlock(b.type)} title={b.description}>
+                    <span className="sb__palette-dot" style={{ background: FAMILY_COLOR[fam] }} />
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* drag to resize the palette */}

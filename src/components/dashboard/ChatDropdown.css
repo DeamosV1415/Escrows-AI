@@ -325,8 +325,10 @@
 }
 
 @media (max-width: 720px) {
+  /* Let the dropdown shrink to the available header space and truncate the chat
+     title (the trigger title already has ellipsis) instead of overflowing. */
   .chat-dropdown {
-    min-width: 240px;
+    min-width: 0;
     max-width: 100%;
   }
 }

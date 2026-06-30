@@ -358,6 +358,9 @@
 .onboarding-connect__icon {
   font-size: 1.4rem;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .onboarding-connect__text {
@@ -439,6 +442,25 @@
   }
   .onboarding-row {
     grid-template-columns: 1fr;
+  }
+
+  /* Stepper: keep numbered dots + connectors, but only the active step keeps
+     its label so the whole row fits on one line instead of overflowing. */
+  .onboarding-progress {
+    gap: 5px;
+  }
+  .onboarding-progress__step {
+    gap: 5px;
+  }
+  .onboarding-progress__label {
+    display: none;
+  }
+  .onboarding-progress__step.is-active .onboarding-progress__label {
+    display: inline;
+  }
+  .onboarding-progress__step:not(:last-child)::after {
+    width: 12px;
+    margin-left: 0;
   }
 }
 

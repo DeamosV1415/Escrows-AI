@@ -4,6 +4,10 @@
 .global-search {
   position: relative;
   flex: 1;
+  /* Allow the search to shrink below its content width so the header action
+     buttons (e.g. the Inbox "Contacts" + "Connect" pair) always fit on phones
+     instead of being pushed off-screen. */
+  min-width: 0;
   max-width: 480px;
 }
 

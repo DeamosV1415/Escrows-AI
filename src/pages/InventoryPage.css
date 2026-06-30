@@ -900,6 +900,16 @@
     flex-direction: column;
   }
 
+  /* In the stacked (column) header the flex main axis is vertical, so the
+     desktop `flex: 0 1 440px` would be read as a 440px HEIGHT. Reset it to a
+     normal full-width row. */
+  .inv__storage {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    align-self: stretch;
+  }
+
   .inv__toolbar {
     flex-direction: column;
     align-items: stretch;

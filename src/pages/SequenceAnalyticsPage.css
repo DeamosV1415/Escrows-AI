@@ -32,4 +32,17 @@
 .sa__danger { color: #c0392b; }
 .sa__empty { padding: 28px; text-align: center; color: var(--text-muted); background: var(--bg-card); border: 1px dashed var(--border-medium); border-radius: 12px; font-size: 14px; }
 
-@media (max-width: 720px) { .sa__stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) {
+  .sa { padding: 20px 0 48px; }
+  /* Compact stat cards packed 3-4 per row, wrapping below — like desktop. */
+  .sa__stats {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 8px;
+  }
+  .sa__stat { padding: 10px 11px; border-radius: 10px; }
+  .sa__stat-val { font-size: 19px; }
+  .sa__stat-lbl { font-size: 11px; }
+  /* The per-sequence rates wrap under the name instead of overflowing the row. */
+  .sa__card-head { flex-wrap: wrap; }
+  .sa__rates { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 10px 16px; }
+}
