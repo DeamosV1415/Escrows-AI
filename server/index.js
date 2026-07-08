@@ -359,8 +359,95 @@ async function start() {
 
   // ─── Serve Frontend (production) — AFTER all API routes ───
   app.use(express.static(distPath));
+
+  // Per-route SEO meta injection.
+  // The app is a client-rendered SPA, so without this every route would ship
+  // the homepage's <title>/canonical in its raw HTML — making Google treat
+  // sub-pages as duplicates of "/" ("Crawled - currently not indexed").
+  // We rewrite the head tags server-side so each public route is self-canonical.
+  const SITE = "https://escrowsai.com";
+  const ROUTE_META = {
+    "/": {
+      title: "Escrows AI — Never Miss a Follow-Up Again",
+      description:
+        "Escrows AI is an AI-powered CRM and follow-up engine for commercial real estate brokers. Manage deals, track conversations, automate outreach, and close faster.",
+    },
+    "/about": {
+      title: "About Us — Escrows AI",
+      description:
+        "Learn about the Escrows AI team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals.",
+    },
+    "/contact": {
+      title: "Contact Us — Escrows AI",
+      description:
+        "Get in touch with the Escrows AI team. We're here to help you streamline your real estate workflow with AI-powered automation.",
+    },
+    "/pricing": {
+      title: "Pricing — Escrows AI",
+      description:
+        "Simple, transparent pricing for CRE brokers. Start free, scale with Growth or Pro plans. AI-powered CRM, call summaries, sequences, and copilot.",
+    },
+    "/privacy-policy": {
+      title: "Privacy Policy — Escrows AI",
+      description:
+        "Learn how Escrows AI collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure.",
+    },
+    "/terms-of-service": {
+      title: "Terms of Service — Escrows AI",
+      description:
+        "Read the Terms of Service governing your use of the Escrows AI platform. Understand your rights, responsibilities, and how our service operates.",
+    },
+    "/cookie-policy": {
+      title: "Cookie Policy — Escrows AI",
+      description:
+        "Find out how Escrows AI uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences.",
+    },
+  };
+
+  const INDEX_HTML = fs.readFileSync(path.join(distPath, "index.html"), "utf8");
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+
   app.get("/{*splat}", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+    const meta = ROUTE_META[req.path];
+    if (!meta) {
+      // App/unknown routes (dashboard, login, etc.) — serve the shell as-is.
+      return res.sendFile(path.join(distPath, "index.html"));
+    }
+    const url = meta === ROUTE_META["/"] ? `${SITE}/` : `${SITE}${req.path}`;
+    const title = esc(meta.title);
+    const description = esc(meta.description);
+    const html = INDEX_HTML
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`)
+      .replace(
+        /<meta\s+name="description"[\s\S]*?\/>/,
+        `<meta name="description" content="${description}" />`,
+      )
+      .replace(
+        /<link\s+rel="canonical"[^>]*\/>/,
+        `<link rel="canonical" href="${url}" />`,
+      )
+      .replace(
+        /<meta\s+property="og:title"[\s\S]*?\/>/,
+        `<meta property="og:title" content="${title}" />`,
+      )
+      .replace(
+        /<meta\s+property="og:description"[\s\S]*?\/>/,
+        `<meta property="og:description" content="${description}" />`,
+      )
+      .replace(
+        /<meta\s+property="og:url"[^>]*\/>/,
+        `<meta property="og:url" content="${url}" />`,
+      )
+      .replace(
+        /<meta\s+name="twitter:title"[\s\S]*?\/>/,
+        `<meta name="twitter:title" content="${title}" />`,
+      )
+      .replace(
+        /<meta\s+name="twitter:description"[\s\S]*?\/>/,
+        `<meta name="twitter:description" content="${description}" />`,
+      );
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
   });
 
   app.listen(PORT, () => {
