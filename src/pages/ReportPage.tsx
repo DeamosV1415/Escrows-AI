@@ -164,7 +164,7 @@ const ReportPage: React.FC = () => {
           <div className="report__header-left">
             <div className="report__logo">EA</div>
             <div>
-              <div className="report__brand-name">Escrows AI</div>
+              <div className="report__brand-name brand-name">Tachikiba</div>
               <div className="report__brand-sub">Pipeline Performance Report</div>
             </div>
           </div>
@@ -392,7 +392,7 @@ const ReportPage: React.FC = () => {
         {/* ─── Footer ─── */}
         <footer className="report__footer">
           <span>Confidential — prepared for {agentName}</span>
-          <span>Escrows AI · {reportId}</span>
+          <span><span className="brand-name">Tachikiba</span> · {reportId}</span>
         </footer>
       </div>
     </div>

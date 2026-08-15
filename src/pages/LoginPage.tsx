@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
+import LogoImg from "../assets/brand/tachikiba-mark.svg";
 import "./LoginPage.css";
 
 /* ─── Google Identity Services types ─── */
@@ -153,8 +154,8 @@ export default function LoginPage() {
       <div className="login-card">
         {/* Logo */}
         <div className="login-logo">
-          <img src="/Logo.png" alt="Escrows AI" />
-          <span>Escrows AI</span>
+          <img src={LogoImg} alt="Tachikiba" />
+          <span className="brand-name">Tachikiba</span>
         </div>
 
         {/* Header */}
@@ -165,7 +166,7 @@ export default function LoginPage() {
           <p className="login-subtitle">
             {isSignUp
               ? "Start managing clients with intelligent automation"
-              : "Sign in to your Escrows AI dashboard"}
+              : "Sign in to your Tachikiba dashboard"}
           </p>
         </div>
 

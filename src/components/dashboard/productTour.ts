@@ -12,7 +12,7 @@ import "./productTour.css";
 const steps: DriveStep[] = [
   {
     popover: {
-      title: "Welcome to Escrows AI ✨",
+      title: "Welcome to Tachikiba ✨",
       description:
         "Here's a 60-second tour of where everything lives. You can skip anytime — let's take a quick look around.",
     },
@@ -50,7 +50,7 @@ const steps: DriveStep[] = [
   {
     element: '[data-tour="nav-sequences"]',
     popover: {
-      title: "Sequences — the heart of Escrows AI",
+      title: "Sequences — the heart of Tachikiba",
       description:
         "Build automated, multi-step follow-ups across email & WhatsApp. Set the steps, the timing and the conditions once, and every lead gets nurtured for you — on autopilot. You can even create one by just describing it to the AI.",
       side: "right",

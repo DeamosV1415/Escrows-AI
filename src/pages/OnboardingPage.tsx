@@ -211,7 +211,8 @@ export default function OnboardingPage() {
             <div className="onboarding-header">
               <span className="onboarding-step">Welcome</span>
               <h1 className="onboarding-title">
-                Welcome to Escrows AI{firstName ? `, ${firstName}` : ""}
+                Welcome to <span className="brand-name">Tachikiba</span>
+                {firstName ? `, ${firstName}` : ""}
               </h1>
               <p className="onboarding-subtitle">
                 Let’s get you set up in under a minute. Here’s what you’ll be able to do.

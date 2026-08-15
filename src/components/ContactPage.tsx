@@ -47,17 +47,17 @@ const ContactPage: React.FC = () => {
   return (
     <main className="contact-page">
       <Helmet>
-        <title>Contact Us — Escrows AI</title>
+        <title>Contact Us — Tachikiba</title>
         <meta
           name="description"
-          content="Get in touch with the Escrows AI team. We're here to help you streamline your real estate workflow with AI-powered automation."
+          content="Get in touch with the Tachikiba team. We're here to help you streamline your real estate workflow with AI-powered automation."
         />
         <link rel="canonical" href="https://escrowsai.com/contact" />
-        <meta property="og:title" content="Contact Us — Escrows AI" />
-        <meta property="og:description" content="Reach out to Escrows AI. Let us show you how intelligent automation can transform your brokerage." />
+        <meta property="og:title" content="Contact Us — Tachikiba" />
+        <meta property="og:description" content="Reach out to Tachikiba. Let us show you how intelligent automation can transform your brokerage." />
         <meta property="og:url" content="https://escrowsai.com/contact" />
-        <meta name="twitter:title" content="Contact Us — Escrows AI" />
-        <meta name="twitter:description" content="Reach out to Escrows AI and discover how AI can transform your brokerage workflow." />
+        <meta name="twitter:title" content="Contact Us — Tachikiba" />
+        <meta name="twitter:description" content="Reach out to Tachikiba and discover how AI can transform your brokerage workflow." />
       </Helmet>
 
       {/* ─── Hero Banner ─── */}
@@ -84,7 +84,7 @@ const ContactPage: React.FC = () => {
               We are always ready to help you and answer your questions
             </h2>
             <p className="contact-info__desc">
-              Escrows AI provides intelligent automation for real estate
+              Tachikiba provides intelligent automation for real estate
               professionals. Reach out and let us show you how we can streamline
               your workflow.
             </p>

@@ -210,13 +210,13 @@ const PricingPage: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Pricing — Escrows AI</title>
+        <title>Pricing — Tachikiba</title>
         <meta
           name="description"
           content="Simple, transparent pricing for CRE brokers. Start free, scale with Growth or Pro plans. AI-powered CRM, call summaries, sequences, and copilot."
         />
         <link rel="canonical" href="https://escrowsai.com/pricing" />
-        <meta property="og:title" content="Pricing — Escrows AI" />
+        <meta property="og:title" content="Pricing — Tachikiba" />
         <meta
           property="og:description"
           content="Simple, transparent pricing for CRE brokers. Start free and scale as you grow."

@@ -18,15 +18,14 @@
   align-items: center;
   gap: 10px;
   color: var(--olive-800);
-  font-family: var(--font-heading);
   font-size: 1.6rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 16px;
 }
 
 .footer__logo-img {
-  height: 40px;
-  width: auto;
+  height: 34px;
+  width: 34px;
   object-fit: contain;
 }
 

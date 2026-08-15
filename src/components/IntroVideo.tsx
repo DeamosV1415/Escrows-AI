@@ -47,7 +47,7 @@ const IntroVideo: React.FC = () => {
                   </svg>
                 </div>
                 <span className="intro-video__label">
-                  Watch How Escrows AI Works
+                  Watch How <span className="brand-name">Tachikiba</span> Works
                 </span>
               </div>
             )}

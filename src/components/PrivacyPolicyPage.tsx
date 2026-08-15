@@ -6,13 +6,13 @@ const PrivacyPolicyPage: React.FC = () => {
   return (
     <main className="legal-page">
       <Helmet>
-        <title>Privacy Policy — Escrows AI</title>
+        <title>Privacy Policy — Tachikiba</title>
         <meta
           name="description"
-          content="Learn how Escrows AI collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure."
+          content="Learn how Tachikiba collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure."
         />
         <link rel="canonical" href="https://escrowsai.com/privacy-policy" />
-        <meta property="og:title" content="Privacy Policy — Escrows AI" />
+        <meta property="og:title" content="Privacy Policy — Tachikiba" />
         <meta property="og:url" content="https://escrowsai.com/privacy-policy" />
       </Helmet>
 
@@ -50,7 +50,7 @@ const PrivacyPolicyPage: React.FC = () => {
 
           {/* Intro */}
           <p className="legal-intro">
-            Escrows AI ("we", "our", or "us") operates the Escrows AI platform and website. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our services.
+            Tachikiba ("we", "our", or "us") operates the Tachikiba platform and website. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our services.
           </p>
 
           {/* Section 1 */}
@@ -77,7 +77,7 @@ const PrivacyPolicyPage: React.FC = () => {
               <li>Referring URLs</li>
             </ul>
             <p style={{ marginTop: "20px" }}><strong>Customer Data</strong></p>
-            <p>If you use the Escrows AI platform, you may upload or store information related to your clients, leads, or transactions. This data remains your property.</p>
+            <p>If you use the Tachikiba platform, you may upload or store information related to your clients, leads, or transactions. This data remains your property.</p>
           </div>
 
           {/* Section 2 */}
@@ -86,7 +86,7 @@ const PrivacyPolicyPage: React.FC = () => {
             <h2 className="legal-section__heading">How We Use Information</h2>
             <p>We use the collected data to:</p>
             <ul className="legal-list">
-              <li>Provide and operate the Escrows AI platform</li>
+              <li>Provide and operate the Tachikiba platform</li>
               <li>Improve our services</li>
               <li>Communicate with users</li>
               <li>Provide customer support</li>
@@ -155,7 +155,7 @@ const PrivacyPolicyPage: React.FC = () => {
           <div className="legal-section">
             <p className="legal-section__number">07</p>
             <h2 className="legal-section__heading">Third-Party Services</h2>
-            <p>Escrows AI may use third-party tools including:</p>
+            <p>Tachikiba may use third-party tools including:</p>
             <ul className="legal-list">
               <li>Analytics providers</li>
               <li>Payment gateways</li>

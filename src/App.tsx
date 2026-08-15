@@ -63,16 +63,16 @@ function LandingPage() {
   return (
     <>
       <Helmet>
-        <title>Escrows AI — Never Miss a Follow-Up Again</title>
+        <title>Tachikiba — Never Miss a Follow-Up Again</title>
         <meta
           name="description"
-          content="AI-powered CRM and follow-up engine for CRE brokers. Manage deals, automate outreach, and close faster with Escrows AI."
+          content="AI-powered CRM and follow-up engine for CRE brokers. Manage deals, automate outreach, and close faster with Tachikiba."
         />
         <link rel="canonical" href="https://escrowsai.com/" />
-        <meta property="og:title" content="Escrows AI — Never Miss a Follow-Up Again" />
+        <meta property="og:title" content="Tachikiba — Never Miss a Follow-Up Again" />
         <meta property="og:description" content="AI-powered CRM and follow-up engine for CRE brokers. Close more deals with intelligent automation." />
         <meta property="og:url" content="https://escrowsai.com/" />
-        <meta name="twitter:title" content="Escrows AI — Never Miss a Follow-Up Again" />
+        <meta name="twitter:title" content="Tachikiba — Never Miss a Follow-Up Again" />
         <meta name="twitter:description" content="AI-powered CRM and follow-up engine for CRE brokers. Close more deals with intelligent automation." />
       </Helmet>
       <ThreeBackground />

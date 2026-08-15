@@ -1,0 +1,30 @@
+/* ════════════════════════════════════════════════════════════
+   TACHIKIBA — Brand name typography (scoped)
+   ────────────────────────────────────────────────────────────
+   This is NOT the reverted dark theme. It is the single font
+   needed so the brand name "Tachikiba" always renders in its
+   wordmark face (Roboto Slab 700, the Amazing Grotesk stand-in),
+   instead of the site's default serif.
+
+   Roboto Slab is Apache-2.0 — licence ships in public/fonts/.
+   The tsuba mark stays an SVG; this covers the NAME as live text.
+   ════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: "Roboto Slab";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/RobotoSlab-700.woff2") format("woff2");
+}
+
+/* Apply to any element showing the brand name. Inherits colour and
+   size from context so it drops into headings, spans and prose.
+   font-family/weight use !important on purpose: this utility's whole
+   job is to guarantee the wordmark face wins over any local rule
+   (e.g. `.login-logo span`), so the brand name is ALWAYS Roboto Slab. */
+.brand-name {
+  font-family: "Roboto Slab", Georgia, "Times New Roman", serif !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+}

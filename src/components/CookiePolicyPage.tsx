@@ -6,13 +6,13 @@ const CookiePolicyPage: React.FC = () => {
   return (
     <main className="legal-page">
       <Helmet>
-        <title>Cookie Policy — Escrows AI</title>
+        <title>Cookie Policy — Tachikiba</title>
         <meta
           name="description"
-          content="Find out how Escrows AI uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences."
+          content="Find out how Tachikiba uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences."
         />
         <link rel="canonical" href="https://escrowsai.com/cookie-policy" />
-        <meta property="og:title" content="Cookie Policy — Escrows AI" />
+        <meta property="og:title" content="Cookie Policy — Tachikiba" />
         <meta property="og:url" content="https://escrowsai.com/cookie-policy" />
       </Helmet>
 
@@ -50,7 +50,7 @@ const CookiePolicyPage: React.FC = () => {
 
           {/* Intro */}
           <p className="legal-intro">
-            This Cookie Policy explains how Escrows AI uses cookies and similar technologies when you visit our website or use our platform.
+            This Cookie Policy explains how Tachikiba uses cookies and similar technologies when you visit our website or use our platform.
           </p>
 
           {/* Section 1 */}

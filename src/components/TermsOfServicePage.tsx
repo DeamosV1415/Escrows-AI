@@ -6,13 +6,13 @@ const TermsOfServicePage: React.FC = () => {
   return (
     <main className="legal-page">
       <Helmet>
-        <title>Terms of Service — Escrows AI</title>
+        <title>Terms of Service — Tachikiba</title>
         <meta
           name="description"
-          content="Read the Terms of Service governing your use of the Escrows AI platform. Understand your rights, responsibilities, and how our service operates."
+          content="Read the Terms of Service governing your use of the Tachikiba platform. Understand your rights, responsibilities, and how our service operates."
         />
         <link rel="canonical" href="https://escrowsai.com/terms-of-service" />
-        <meta property="og:title" content="Terms of Service — Escrows AI" />
+        <meta property="og:title" content="Terms of Service — Tachikiba" />
         <meta property="og:url" content="https://escrowsai.com/terms-of-service" />
       </Helmet>
 
@@ -50,14 +50,14 @@ const TermsOfServicePage: React.FC = () => {
 
           {/* Intro */}
           <p className="legal-intro">
-            These Terms govern your access to and use of the Escrows AI platform. By using our services, you agree to these Terms.
+            These Terms govern your access to and use of the Tachikiba platform. By using our services, you agree to these Terms.
           </p>
 
           {/* Section 1 */}
           <div className="legal-section">
             <p className="legal-section__number">01</p>
             <h2 className="legal-section__heading">Use of Service</h2>
-            <p>Escrows AI provides software tools to assist brokerages with managing client relationships, deal workflows, and operational tasks.</p>
+            <p>Tachikiba provides software tools to assist brokerages with managing client relationships, deal workflows, and operational tasks.</p>
             <p>You agree to use the service only for lawful purposes.</p>
           </div>
 
@@ -78,7 +78,7 @@ const TermsOfServicePage: React.FC = () => {
             <p className="legal-section__number">03</p>
             <h2 className="legal-section__heading">Customer Data</h2>
             <p>Users may upload or manage data related to their business. You retain ownership of your data.</p>
-            <p>By using the service, you grant Escrows AI permission to process this data to operate the platform.</p>
+            <p>By using the service, you grant Tachikiba permission to process this data to operate the platform.</p>
           </div>
 
           {/* Section 4 */}
@@ -117,8 +117,8 @@ const TermsOfServicePage: React.FC = () => {
           <div className="legal-section">
             <p className="legal-section__number">07</p>
             <h2 className="legal-section__heading">Limitation of Liability</h2>
-            <p>Escrows AI is provided <strong>"as is."</strong></p>
-            <p>To the maximum extent permitted by law, Escrows AI shall not be liable for:</p>
+            <p>Tachikiba is provided <strong>"as is."</strong></p>
+            <p>To the maximum extent permitted by law, Tachikiba shall not be liable for:</p>
             <ul className="legal-list">
               <li>Loss of profits</li>
               <li>Data loss</li>

@@ -99,6 +99,11 @@ app.use(
 );
 
 const allowedOrigins = [
+  // New brand domain (tachikiba.com). Old escrowsai.com origins stay
+  // until the domain cutover is complete and the 301s are live —
+  // removing them early would break the API for the live site.
+  "https://www.tachikiba.com",
+  "https://tachikiba.com",
   "https://www.escrowsai.com",
   "https://escrowsai.com",
 ];
@@ -368,39 +373,39 @@ async function start() {
   const SITE = "https://escrowsai.com";
   const ROUTE_META = {
     "/": {
-      title: "Escrows AI — Never Miss a Follow-Up Again",
+      title: "Tachikiba — Never Miss a Follow-Up Again",
       description:
-        "Escrows AI is an AI-powered CRM and follow-up engine for commercial real estate brokers. Manage deals, track conversations, automate outreach, and close faster.",
+        "Tachikiba is an AI-powered CRM and follow-up engine for commercial real estate brokers. Manage deals, track conversations, automate outreach, and close faster.",
     },
     "/about": {
-      title: "About Us — Escrows AI",
+      title: "About Us — Tachikiba",
       description:
-        "Learn about the Escrows AI team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals.",
+        "Learn about the Tachikiba team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals.",
     },
     "/contact": {
-      title: "Contact Us — Escrows AI",
+      title: "Contact Us — Tachikiba",
       description:
-        "Get in touch with the Escrows AI team. We're here to help you streamline your real estate workflow with AI-powered automation.",
+        "Get in touch with the Tachikiba team. We're here to help you streamline your real estate workflow with AI-powered automation.",
     },
     "/pricing": {
-      title: "Pricing — Escrows AI",
+      title: "Pricing — Tachikiba",
       description:
         "Simple, transparent pricing for CRE brokers. Start free, scale with Growth or Pro plans. AI-powered CRM, call summaries, sequences, and copilot.",
     },
     "/privacy-policy": {
-      title: "Privacy Policy — Escrows AI",
+      title: "Privacy Policy — Tachikiba",
       description:
-        "Learn how Escrows AI collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure.",
+        "Learn how Tachikiba collects, uses, and protects your personal data. Our Privacy Policy outlines your rights and how we keep your information secure.",
     },
     "/terms-of-service": {
-      title: "Terms of Service — Escrows AI",
+      title: "Terms of Service — Tachikiba",
       description:
-        "Read the Terms of Service governing your use of the Escrows AI platform. Understand your rights, responsibilities, and how our service operates.",
+        "Read the Terms of Service governing your use of the Tachikiba platform. Understand your rights, responsibilities, and how our service operates.",
     },
     "/cookie-policy": {
-      title: "Cookie Policy — Escrows AI",
+      title: "Cookie Policy — Tachikiba",
       description:
-        "Find out how Escrows AI uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences.",
+        "Find out how Tachikiba uses cookies and similar technologies on its platform. Learn what cookies we use and how to manage your preferences.",
     },
   };
 

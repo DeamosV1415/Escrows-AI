@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import logoImg from "../assets/Logo.png";
+import logoImg from "../assets/brand/tachikiba-mark.svg";
 import "./Footer.css";
 
 const Footer: React.FC = () => {
@@ -11,10 +11,10 @@ const Footer: React.FC = () => {
             <a href="#" className="footer__logo">
               <img
                 src={logoImg}
-                alt="Escrows AI"
+                alt="Tachikiba"
                 className="footer__logo-img"
               />
-              <span>Escrows AI</span>
+              <span className="brand-name">Tachikiba</span>
             </a>
             <p className="footer__desc">
               Transform your client relationships with intelligent automation,
@@ -43,7 +43,7 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="footer__bottom">
-          <p>© {new Date().getFullYear()} Escrows AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Tachikiba. All rights reserved.</p>
           <div className="footer__social">
             <a
               href="https://x.com/escrowsai"

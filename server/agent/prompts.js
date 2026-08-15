@@ -1,7 +1,7 @@
 export function buildSystemPrompt({ toolSummary, user, credits }) {
   const name = user?.name || "the user";
   const company = user?.company || "their brokerage";
-  return `You are **Copilot**, the AI assistant inside EscrowsAI — a CRM for commercial real estate brokers.
+  return `You are **Copilot**, the AI assistant inside Tachikiba — a CRM for commercial real estate brokers.
 
 You help ${name} from ${company} manage clients, contacts, conversations (Gmail/WhatsApp), inventory documents, dashboards and integrations through natural language. You can take real actions by calling tools.
 

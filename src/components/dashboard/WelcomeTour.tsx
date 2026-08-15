@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import LogoImg from "../../assets/Logo.png";
+import LogoImg from "../../assets/brand/tachikiba-mark.svg";
 import { startProductTour } from "./productTour";
 import "./WelcomeTour.css";
 
@@ -165,7 +165,7 @@ export default function WelcomeTour() {
             <span className="wtour-orb__ring wtour-orb__ring--2" aria-hidden />
             <span className="wtour-orb__halo" aria-hidden />
             <span className="wtour-orb__core" aria-hidden>
-              <img src={LogoImg} alt="Escrows AI" />
+              <img src={LogoImg} alt="Tachikiba" />
             </span>
             {/* drifting gold dust */}
             <span className="wtour-orb__dust" aria-hidden>
@@ -193,7 +193,9 @@ export default function WelcomeTour() {
             <span className="wtour-prompt__spark" aria-hidden>
               <SparkIcon size={24} />
             </span>
-            <span className="wtour-prompt__eyebrow">Welcome to Escrows AI</span>
+            <span className="wtour-prompt__eyebrow">
+              Welcome to <span className="brand-name">Tachikiba</span>
+            </span>
             <h1 className="wtour-prompt__title">You&rsquo;re all set</h1>
             <p className="wtour-prompt__desc">
               Your workspace is ready. Take a short guided tour to see where everything

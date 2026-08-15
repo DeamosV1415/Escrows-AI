@@ -1093,7 +1093,7 @@ const SettingsPage: React.FC = () => {
           <h3 className="settings-about-card__title">Resources</h3>
           <ul className="settings-about-links">
             <li><a href="/pricing" target="_blank" rel="noreferrer">Plans &amp; pricing ↗</a></li>
-            <li><a href="/about" target="_blank" rel="noreferrer">About Escrows AI ↗</a></li>
+            <li><a href="/about" target="_blank" rel="noreferrer">About Tachikiba ↗</a></li>
             <li><a href="/privacy-policy" target="_blank" rel="noreferrer">Privacy policy ↗</a></li>
             <li><a href="/terms-of-service" target="_blank" rel="noreferrer">Terms of service ↗</a></li>
           </ul>
@@ -1111,7 +1111,7 @@ const SettingsPage: React.FC = () => {
         </div>
         <div className="settings-about-meta__item">
           <span>Application</span>
-          <strong>Escrows AI · v1.0</strong>
+          <strong><span className="brand-name">Tachikiba</span> · v1.0</strong>
         </div>
       </div>
     </div>

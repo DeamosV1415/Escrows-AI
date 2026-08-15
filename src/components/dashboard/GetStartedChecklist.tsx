@@ -141,7 +141,7 @@ const GetStartedChecklist: React.FC<Props> = ({ clientsCount, sequencesRunning }
           <span className="getstarted__head-text">
             <span className="getstarted__title">Get started</span>
             <span className="getstarted__sub">
-              {doneCount} of {total} done{collapsed ? "" : " — a few quick steps to get the most out of Escrows AI."}
+              {doneCount} of {total} done{collapsed ? "" : " — a few quick steps to get the most out of Tachikiba."}
             </span>
           </span>
         </button>

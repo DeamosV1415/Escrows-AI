@@ -70,7 +70,9 @@
 .login-logo img {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  /* The tsuba mark SVG renders black; this card is near-black, so
+     invert it to a light emblem for contrast. */
+  filter: brightness(0) invert(1);
 }
 
 .login-logo span {

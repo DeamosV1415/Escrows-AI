@@ -68,17 +68,17 @@ const AboutPage: React.FC = () => {
   return (
     <main className="about-page">
       <Helmet>
-        <title>About Us — Escrows AI</title>
+        <title>About Us — Tachikiba</title>
         <meta
           name="description"
-          content="Learn about the Escrows AI team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals."
+          content="Learn about the Tachikiba team — our mission, vision, and values. We're building AI-powered tools that help CRE brokers work smarter and close more deals."
         />
         <link rel="canonical" href="https://escrowsai.com/about" />
-        <meta property="og:title" content="About Us — Escrows AI" />
-        <meta property="og:description" content="Meet the team behind Escrows AI and learn how we're transforming the way real estate professionals work." />
+        <meta property="og:title" content="About Us — Tachikiba" />
+        <meta property="og:description" content="Meet the team behind Tachikiba and learn how we're transforming the way real estate professionals work." />
         <meta property="og:url" content="https://escrowsai.com/about" />
-        <meta name="twitter:title" content="About Us — Escrows AI" />
-        <meta name="twitter:description" content="Meet the team behind Escrows AI and learn how we're transforming real estate workflows." />
+        <meta name="twitter:title" content="About Us — Tachikiba" />
+        <meta name="twitter:description" content="Meet the team behind Tachikiba and learn how we're transforming real estate workflows." />
       </Helmet>
 
       {/* ══════════ 1 · Hero Banner ══════════ */}
@@ -111,7 +111,7 @@ const AboutPage: React.FC = () => {
               managing processes than closing transactions.
             </p>
             <p className="about-story__paragraph">
-              Escrows AI was created to change that.
+              Tachikiba was created to change that.
             </p>
             <p className="about-story__paragraph">
               Instead of another traditional CRM, we’re building an intelligent

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import "./Sidebar.css";
-import LogoImg from "../../assets/Logo.png";
+import LogoImg from "../../assets/brand/tachikiba-mark.svg";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -258,8 +258,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobileOpen, onCl
           style={collapsed ? { cursor: "pointer" } : undefined}
           title={collapsed ? "Expand sidebar" : undefined}
         >
-          <img src={LogoImg} alt="EscrowsAI" className="sidebar__logo-img" />
-          {!collapsed && <span className="sidebar__logo-text">EscrowsAI</span>}
+          <img src={LogoImg} alt="Tachikiba" className="sidebar__logo-img" />
+          {!collapsed && (
+            <span className="sidebar__logo-text brand-name">Tachikiba</span>
+          )}
         </div>
         {/* Mobile: close the drawer. Desktop-only collapse chevron is hidden on phones. */}
         <button

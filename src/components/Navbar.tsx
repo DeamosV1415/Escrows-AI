@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./Navbar.css";
-import LogoImg from "../assets/Logo.png";
+import LogoImg from "../assets/brand/tachikiba-mark.svg";
 
 const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -28,11 +28,11 @@ const Navbar: React.FC = () => {
         <div className="header__logo-icon">
           <img
             src={LogoImg}
-            alt="Escrows AI Logo"
+            alt="Tachikiba Logo"
             className="header__logo-img"
           />
         </div>
-        <span className="header__logo-text">Escrows AI</span>
+        <span className="header__logo-text brand-name">Tachikiba</span>
       </Link>
 
       {/* Glassmorphed Nav — only the 4 links */}
